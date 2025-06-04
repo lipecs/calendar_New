@@ -1,3 +1,4 @@
+// src/services/user.js - CORRIGIDO
 import axios from 'axios';
 import authService from './auth';
 
@@ -5,7 +6,7 @@ const API_URL = 'http://localhost:8080/api';
 const ADMIN_API_URL = 'http://localhost:8080/api/admin';
 
 class UserService {
-  // Métodos para administradores
+  // ✅ CORRIGIDO: Métodos para administradores
   async getAllUsers() {
     try {
       authService.isAuthenticated();
@@ -18,29 +19,30 @@ class UserService {
     }
   }
 
-  // Adicione este método na classe UserService
-async getUserById(id) {
-  try {
-    authService.isAuthenticated();
-    
-    const response = await axios.get(ADMIN_API_URL + `/users/${id}`);
-    return response.data;
-  } catch (error) {
-    console.error('Erro ao buscar usuário por ID:', error);
-    throw error;
+  async getUserById(id) {
+    try {
+      authService.isAuthenticated();
+      
+      const response = await axios.get(ADMIN_API_URL + `/users/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar usuário por ID:', error);
+      throw error;
+    }
   }
-}
 
+  // ✅ CORRIGIDO: Criar usuário
   async createUser(userData) {
     try {
       authService.isAuthenticated();
       
-      // Preparar dados para o backend
       const payload = {
         username: userData.username,
         email: userData.email,
         password: userData.password,
-        admin: userData.role?.includes('admin') || false
+        role: userData.role, // ✅ CORRIGIDO: Usar role em vez de admin
+        supervisorId: userData.supervisorId || null,
+        coordenadorId: userData.coordenadorId || null
       };
       
       const response = await axios.post(ADMIN_API_URL + '/users', payload);
@@ -51,15 +53,17 @@ async getUserById(id) {
     }
   }
 
+  // ✅ CORRIGIDO: Atualizar usuário
   async updateUser(id, userData) {
     try {
       authService.isAuthenticated();
       
-      // Preparar dados para o backend
       const payload = {
         username: userData.username,      
         email: userData.email,
-        admin: userData.role?.includes('admin') || false
+        role: userData.role, // ✅ CORRIGIDO: Usar role em vez de admin
+        supervisorId: userData.supervisorId || null,
+        coordenadorId: userData.coordenadorId || null
       };
       
       // Incluir senha apenas se fornecida
@@ -87,7 +91,33 @@ async getUserById(id) {
     }
   }
 
-  // Novos métodos para perfil do usuário
+  // ✅ NOVO: Buscar coordenadores
+  async getCoordenadores() {
+    try {
+      authService.isAuthenticated();
+      
+      const response = await axios.get(ADMIN_API_URL + '/coordenadores');
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar coordenadores:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Buscar supervisores
+  async getSupervisores() {
+    try {
+      authService.isAuthenticated();
+      
+      const response = await axios.get(ADMIN_API_URL + '/supervisores');
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar supervisores:', error);
+      throw error;
+    }
+  }
+
+  // Métodos existentes para perfil do usuário
   async updateProfile(userData) {
     try {
       authService.isAuthenticated();
@@ -97,21 +127,17 @@ async getUserById(id) {
         email: userData.email
       };
       
-      // Se alterando senha, usar endpoint específico
       if (userData.password && userData.password.trim() && userData.currentPassword) {
-        // Primeiro atualizar dados básicos
         const profileResponse = await axios.put(API_URL + '/user/profile', {
           username: userData.username,
           email: userData.email
         });
         
-        // Depois alterar a senha
         await this.changePassword(userData.currentPassword, userData.password);
         
         return profileResponse.data;
       } else {
-        // Apenas atualizar dados básicos
-        const response = await axios.put(API_URL + '/user/profile'  , payload);
+        const response = await axios.put(API_URL + '/user/profile', payload);
         return response.data;
       }
     } catch (error) {

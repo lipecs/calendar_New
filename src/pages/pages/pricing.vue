@@ -1,4 +1,4 @@
-<!-- src/pages/pages/pricing.vue - ATUALIZADO para Gerenciamento de Clientes -->
+<!-- src/pages/pages/pricing.vue - CORRIGIDO para Backend Real -->
 <template>
   <VCard>
     <VCardTitle class="d-flex justify-space-between align-center flex-wrap">
@@ -28,7 +28,6 @@
             @input="searchClients"
           />
         </VCol>
-        <!-- ✅ NOVO: Filtro por coordenador -->
         <VCol cols="12" md="3">
           <VSelect
             v-model="filterByCoordenador"
@@ -40,7 +39,6 @@
             @update:model-value="filterClients"
           />
         </VCol>
-        <!-- ✅ NOVO: Filtro por vendedor -->
         <VCol cols="12" md="3">
           <VSelect
             v-model="filterByVendedor"
@@ -72,7 +70,6 @@
         :headers="headers"
         :items="filteredClients"
         :loading="isLoading"
-        :search="searchQuery"
         class="elevation-1"
         :items-per-page="10"
       >
@@ -87,7 +84,7 @@
           </VChip>
         </template>
         
-        <!-- ✅ ATUALIZADO: Coordenador Responsável -->
+        <!-- Coordenador Responsável -->
         <template #item.coordenador="{ item }">
           <div v-if="item.coordenador" class="d-flex align-center">
             <VAvatar size="32" class="me-2">
@@ -107,7 +104,7 @@
           </VChip>
         </template>
         
-        <!-- ✅ ATUALIZADO: Vendedor Responsável -->
+        <!-- Vendedor Responsável -->
         <template #item.vendedor="{ item }">
           <div v-if="item.vendedor" class="d-flex align-center">
             <VAvatar size="32" class="me-2">
@@ -222,7 +219,7 @@
                 />
               </VCol>
               
-              <!-- ✅ NOVO: Coordenador Responsável -->
+              <!-- Coordenador Responsável -->
               <VCol cols="12" md="6">
                 <VSelect
                   v-model="clientData.coordenadorId"
@@ -235,12 +232,12 @@
                 />
               </VCol>
               
-              <!-- ✅ NOVO: Vendedor Responsável -->
+              <!-- Vendedor Responsável -->
               <VCol cols="12" md="6">
                 <VSelect
                   v-model="clientData.vendedorId"
                   :label="$t('Vendedor Responsável')"
-                  :items="availableVendedores"
+                  :items="filteredVendedores"
                   item-title="username"
                   item-value="id"
                   :rules="[v => !!v || $t('Vendedor é obrigatório')]"
@@ -327,10 +324,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import authService from '@/services/auth';
 import userService from '@/services/user';
+import clientService from '@/services/client';
 
 const { t } = useI18n();
 
@@ -351,7 +349,7 @@ const filterByVendedor = ref(null);
 const clientDialog = ref(false);
 const deleteDialog = ref(false);
 
-// ✅ ATUALIZADO: Dados do cliente com coordenador e vendedor
+// ✅ ATUALIZADO: Dados do cliente
 const clientData = ref({
   name: '',
   code: '',
@@ -394,93 +392,40 @@ const statusOptions = [
   { title: t('Bloqueado'), value: 'Bloqueado' }
 ];
 
-// ✅ NOVO: Carregar coordenadores e vendedores
+// ✅ NOVO: Filtrar vendedores baseado no coordenador selecionado
+const filteredVendedores = computed(() => {
+  if (!clientData.value.coordenadorId) {
+    return availableVendedores.value;
+  }
+  
+  return availableVendedores.value.filter(vendedor => 
+    vendedor.coordenadorId === clientData.value.coordenadorId
+  );
+});
+
+// ✅ NOVO: Carregar coordenadores e vendedores do backend
 const loadUsers = async () => {
   try {
     const users = await userService.getAllUsers();
     
-    // Filtrar coordenadores e vendedores baseado na hierarquia
-    const currentUser = authService.getCurrentUser();
-    const currentUserLevel = authService.getHierarchyLevel();
-    
-    if (currentUserLevel >= 4) {
-      // Admin/Diretor vê todos
-      availableCoordenadores.value = users.filter(u => u.role === 'coordenador');
-      availableVendedores.value = users.filter(u => u.role === 'vendedor');
-    } else if (currentUserLevel === 3) {
-      // Supervisor vê seus subordinados
-      availableCoordenadores.value = users.filter(u => 
-        u.role === 'coordenador' && u.supervisorId === currentUser.userData.id
-      );
-      availableVendedores.value = users.filter(u => 
-        u.role === 'vendedor' && u.supervisorId === currentUser.userData.id
-      );
-    }
+    availableCoordenadores.value = users.filter(u => u.role === 'coordenador');
+    availableVendedores.value = users.filter(u => u.role === 'vendedor');
   } catch (error) {
+    console.error('Erro ao carregar usuários:', error);
     showAlert('error', t('Erro ao carregar usuários'));
   }
 };
 
-// Métodos
+// ✅ NOVO: Carregar clientes do backend
 const loadClients = async () => {
   try {
     isLoading.value = true;
     
-    // ✅ SIMULAÇÃO: Dados mockados com relacionamentos
-    clients.value = [
-      {
-        id: 1,
-        name: 'Empresa ABC Ltda',
-        code: 'CLI001',
-        email: 'contato@empresaabc.com',
-        phone: '(11) 9999-9999',
-        address: 'Rua das Flores, 123',
-        notes: 'Cliente importante',
-        status: 'Ativo',
-        coordenadorId: 1,
-        vendedorId: 2,
-        coordenador: { id: 1, username: 'coordenador1', email: 'coord1@empresa.com' },
-        vendedor: { id: 2, username: 'vendedor1', email: 'vend1@empresa.com' },
-        createdAt: new Date('2024-01-15')
-      },
-      {
-        id: 2,
-        name: 'XYZ Comercial',
-        code: 'CLI002', 
-        email: 'xyz@comercial.com',
-        phone: '(11) 8888-8888',
-        address: 'Av. Principal, 456',
-        notes: '',
-        status: 'Prospecto',
-        coordenadorId: 1,
-        vendedorId: null,
-        coordenador: { id: 1, username: 'coordenador1', email: 'coord1@empresa.com' },
-        vendedor: null,
-        createdAt: new Date('2024-02-10')
-      }
-    ];
-    
-    // ✅ FILTRAR: Clientes baseado na hierarquia do usuário
-    const currentUser = authService.getCurrentUser();
-    const currentUserLevel = authService.getHierarchyLevel();
-    
-    if (currentUserLevel < 3) {
-      // Coordenador vê apenas clientes atribuídos a ele
-      if (currentUserLevel === 2) {
-        clients.value = clients.value.filter(client => 
-          client.coordenadorId === currentUser.userData.id
-        );
-      }
-      // Vendedor vê apenas clientes atribuídos a ele
-      else if (currentUserLevel === 1) {
-        clients.value = clients.value.filter(client => 
-          client.vendedorId === currentUser.userData.id
-        );
-      }
-    }
-    
+    const data = await clientService.getAllClients();
+    clients.value = data;
     filteredClients.value = [...clients.value];
   } catch (error) {
+    console.error('Erro ao carregar clientes:', error);
     showAlert('error', t('Erro ao carregar clientes'));
   } finally {
     isLoading.value = false;
@@ -558,51 +503,20 @@ const closeClientDialog = () => {
   };
 };
 
+// ✅ CORRIGIDO: Salvar cliente usando backend
 const saveClient = async () => {
   try {
     isLoading.value = true;
     
-    // Validação básica
-    if (!clientData.value.name || !clientData.value.code) {
-      throw new Error(t('Nome e código são obrigatórios'));
-    }
-    
-    if (!clientData.value.coordenadorId || !clientData.value.vendedorId) {
-      throw new Error(t('Coordenador e vendedor são obrigatórios'));
-    }
-    
-    // Verificar se código já existe (apenas para novos clientes)
-    if (!isEditMode.value) {
-      const existingClient = clients.value.find(c => c.code === clientData.value.code);
-      if (existingClient) {
-        throw new Error(t('Código do cliente já existe'));
-      }
-    }
-    
-    // Buscar dados do coordenador e vendedor
-    const coordenador = availableCoordenadores.value.find(c => c.id === clientData.value.coordenadorId);
-    const vendedor = availableVendedores.value.find(v => v.id === clientData.value.vendedorId);
-    
     if (isEditMode.value) {
-      // Atualizar cliente existente
+      const updatedClient = await clientService.updateClient(clientData.value.id, clientData.value);
       const index = clients.value.findIndex(c => c.id === clientData.value.id);
       if (index !== -1) {
-        clients.value[index] = { 
-          ...clientData.value,
-          coordenador,
-          vendedor
-        };
-        showAlert('success', t('Cliente atualizado com sucesso'));
+        clients.value[index] = updatedClient;
       }
+      showAlert('success', t('Cliente atualizado com sucesso'));
     } else {
-      // Adicionar novo cliente
-      const newClient = {
-        ...clientData.value,
-        id: Date.now(), // Simulação de ID
-        createdAt: new Date(),
-        coordenador,
-        vendedor
-      };
+      const newClient = await clientService.createClient(clientData.value);
       clients.value.push(newClient);
       showAlert('success', t('Cliente adicionado com sucesso'));
     }
@@ -610,7 +524,9 @@ const saveClient = async () => {
     filterClients();
     closeClientDialog();
   } catch (error) {
-    showAlert('error', error.message);
+    console.error('Erro ao salvar cliente:', error);
+    const errorMessage = error.response?.data || error.message;
+    showAlert('error', errorMessage);
   } finally {
     isLoading.value = false;
   }
@@ -621,21 +537,27 @@ const confirmDeleteClient = (client) => {
   deleteDialog.value = true;
 };
 
+// ✅ CORRIGIDO: Excluir cliente usando backend
 const deleteClient = async () => {
   try {
     isLoading.value = true;
     
+    await clientService.deleteClient(clientToDelete.value.id);
+    
     const index = clients.value.findIndex(c => c.id === clientToDelete.value.id);
     if (index !== -1) {
       clients.value.splice(index, 1);
-      showAlert('success', t('Cliente excluído com sucesso'));
-      filterClients();
     }
+    
+    showAlert('success', t('Cliente excluído com sucesso'));
+    filterClients();
     
     deleteDialog.value = false;
     clientToDelete.value = null;
   } catch (error) {
-    showAlert('error', t('Erro ao excluir cliente'));
+    console.error('Erro ao excluir cliente:', error);
+    const errorMessage = error.response?.data || error.message;
+    showAlert('error', errorMessage);
   } finally {
     isLoading.value = false;
   }
@@ -666,6 +588,17 @@ const showAlert = (type, message) => {
     alert.value.show = false;
   }, 5000);
 };
+
+// ✅ NOVO: Watch para limpar vendedor quando coordenador muda
+watch(() => clientData.value.coordenadorId, (newCoordenadorId) => {
+  // Se o vendedor atual não pertence ao novo coordenador, limpar
+  if (clientData.value.vendedorId) {
+    const vendedor = availableVendedores.value.find(v => v.id === clientData.value.vendedorId);
+    if (!vendedor || vendedor.coordenadorId !== newCoordenadorId) {
+      clientData.value.vendedorId = null;
+    }
+  }
+});
 
 // Lifecycle
 onMounted(() => {
