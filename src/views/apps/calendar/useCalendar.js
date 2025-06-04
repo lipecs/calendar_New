@@ -104,38 +104,90 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     })
   }
 
-  // ATUALIZADO: Buscar eventos com controle de usuário
+  // ✅ CORRIGIDO: Buscar eventos com controle de usuário
   const fetchEvents = (info, successCallback) => {
     if (!info) return
-    
+
+    console.log('🔄 fetchEvents chamado com info:', info);
+
     // Obter usuário selecionado (para admin) ou usuário atual
     const currentUser = authService.getCurrentUser()
     const isAdmin = authService.isAdmin()
-    
-    // Se for admin e tiver um usuário selecionado na página do calendário
-    const selectedUserId = isAdmin && window.selectedUserId ? window.selectedUserId : null
-    
+    const isDiretor = authService.isDiretor()
+
+    // ✅ CORRIGIDO: Verificar se há um usuário selecionado globalmente
+    let selectedUserId = null;
+
+    // Verificar múltiplas formas de obter o usuário selecionado
+    if (isAdmin || isDiretor) {
+      // Prioridade: window.selectedUserId (seleção no dropdown)
+      if (window.selectedUserId) {
+        selectedUserId = window.selectedUserId;
+        console.log('👤 Usando usuário selecionado do dropdown:', selectedUserId);
+      }
+      // Alternativa: prop selectedUserId
+      else if (window.calendarSelectedUserId) {
+        selectedUserId = window.calendarSelectedUserId;
+        console.log('👤 Usando usuário selecionado da prop:', selectedUserId);
+      }
+      else {
+        console.log('👥 Admin/Diretor visualizando todos os eventos (nenhum usuário específico selecionado)');
+        selectedUserId = null; // Ver todos os eventos
+      }
+    } else {
+      // Usuário comum sempre vê apenas seus próprios eventos
+      selectedUserId = currentUser?.userData?.id;
+      console.log('👤 Usuário comum visualizando próprios eventos:', selectedUserId);
+    }
+
+    console.log('📊 Estado da busca:', {
+      currentUserId: currentUser?.userData?.id,
+      isAdmin,
+      isDiretor,
+      selectedUserId,
+      windowSelectedUserId: window.selectedUserId,
+      windowCalendarSelectedUserId: window.calendarSelectedUserId
+    });
+
     store.fetchEvents(selectedUserId)
-      .then(r => {
-        if (r?.message) {
-          console.error('Erro ao buscar eventos:', r.message)
-          successCallback([])
-          return
+      .then(events => {
+        console.log('📥 Eventos recebidos do store:', events.length);
+
+        if (!Array.isArray(events)) {
+          console.error('❌ Resposta inválida do store:', events);
+          successCallback([]);
+          return;
         }
 
-        const events = r.map(e => ({
-          ...e,
-          start: new Date(e.start),
-          end: new Date(e.end),
-        }))
+        // ✅ CORRIGIDO: Mapear eventos para o formato do FullCalendar
+        const formattedEvents = events.map(e => {
+          const formattedEvent = {
+            ...e,
+            start: new Date(e.start),
+            end: new Date(e.end),
+          };
 
-        const coloredEvents = applyEventColors(events)
-        successCallback(coloredEvents)
+          console.log('📝 Evento formatado:', {
+            id: formattedEvent.id,
+            title: formattedEvent.title,
+            start: formattedEvent.start,
+            end: formattedEvent.end,
+            userId: formattedEvent.userId,
+            client: formattedEvent.extendedProps?.cliente
+          });
+
+          return formattedEvent;
+        });
+
+        const coloredEvents = applyEventColors(formattedEvents);
+        console.log('🎨 Eventos com cores aplicadas:', coloredEvents.length);
+
+        successCallback(coloredEvents);
       })
-      .catch(e => {
-        console.error('Erro ao buscar eventos', e)
-        successCallback([])
-      })
+      .catch(error => {
+        console.error('❌ Erro ao buscar eventos no useCalendar:', error);
+        successCallback([]);
+      });
   }
 
   const updateEventInCalendar = (updatedEventData, propsToUpdate, extendedPropsToUpdate) => {

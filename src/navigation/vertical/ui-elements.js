@@ -19,7 +19,7 @@ export default [
   // ✅ NOVO: Gerenciamento de Clientes (diretor, supervisor)
   {
     title: 'Cliente',
-    icon: { icon: 'ri-hand-heart-line' },
+    icon: { icon: 'ri-file-user-line' },
     to: 'pages-pricing',
     action: 'manage',
     subject: 'Clientes',

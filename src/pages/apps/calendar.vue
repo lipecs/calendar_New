@@ -1,16 +1,16 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
 import authService from '@/services/auth';
 import userService from '@/services/user';
 import {
   blankEvent,
   useCalendar,
-} from '@/views/apps/calendar/useCalendar'
-import { useCalendarStore } from '@/views/apps/calendar/useCalendarStore'
-import FullCalendar from '@fullcalendar/vue3'
+} from '@/views/apps/calendar/useCalendar';
+import { useCalendarStore } from '@/views/apps/calendar/useCalendarStore';
+import FullCalendar from '@fullcalendar/vue3';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 // Components
-import CalendarEventHandler from '@/views/apps/calendar/CalendarEventHandler.vue'
+import CalendarEventHandler from '@/views/apps/calendar/CalendarEventHandler.vue';
 
 const router = useRouter();
 const store = useCalendarStore()
@@ -40,7 +40,7 @@ const {
 // Adicionando timeZone ao calendarOptions
 calendarOptions.value = {
   ...calendarOptions.value,
-  timeZone: 'America/Sao_Paulo', // Configuração do fuso horário de São Paulo
+  timeZone: 'America/Sao_Paulo',
 }
 
 // Carregar usuários (apenas para admin)
@@ -55,13 +55,14 @@ const loadUsers = async () => {
   }
 };
 
-// ✅ CORREÇÃO: Expor selectedUserId globalmente para o useCalendar
-watch(selectedUserId, (newValue) => {
+// Expor selectedUserId globalmente para o useCalendar
+watch(selectedUserId, (newValue, oldValue) => {
   window.selectedUserId = newValue;
-  if (refCalendar.value) {
-    refetchEvents();
-  }
-});
+  window.calendarSelectedUserId = newValue;
+  nextTick(() => {
+    if (refCalendar.value) refetchEvents();
+  });
+}, { immediate: false });
 
 const checkAll = computed({
   get: () => store.selectedCalendars.length === store.availableCalendars.length,
@@ -130,23 +131,16 @@ function removeCalendarFilter(label) {
   }
 }
 
-const calendarApi = ref(null)
-
-// Carregar dados ao montar o componente
 onMounted(async () => {
   if (!authService.isAuthenticated()) {
     router.push('/login');
     return;
   }
-
-  await loadUsers();
+  if (isAdmin.value) await loadUsers();
   await store.fetchFilters();
-
-  // ✅ CORREÇÃO: Aguardar um ciclo antes de refetch
+  // Aguarda o próximo tick para garantir que o calendário esteja montado
   nextTick(() => {
-    if (refCalendar.value) {
-      refetchEvents();
-    }
+    if (refCalendar.value) refetchEvents();
   });
 });
 
@@ -165,8 +159,6 @@ definePage({
       <!-- Header do calendário com seletor de usuário para admin -->
       <VCardTitle v-if="isAdmin" class="d-flex justify-space-between align-center flex-wrap pa-4">
         <span>{{ $t('Calendar') }}</span>
-
-        <!-- Seletor de usuário para admin -->
         <div class="d-flex align-center gap-4">
           <VSelect v-model="selectedUserId" :items="[
             { title: $t('Todos os usuários'), value: null },
