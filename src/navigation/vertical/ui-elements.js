@@ -1,26 +1,29 @@
 export default [
-  { heading: 'Settings', 
-    to: 'admin-users',
-    action: 'manage',
-    subject: 'Users',
-  },
-   {
+  {
     title: 'Users Management',
     icon: { icon: 'ri-user-settings-line' },
     to: 'admin-users',
     action: 'manage',
     subject: 'Users',
   },
-{
-  title: 'Vendedor',
-  icon: { icon: 'ri-briefcase-4-line' }, // Representa trabalho, negócio, vendas
-  to: 'pages-icons',
-},
-{
-  title: 'Cliente',
-  icon: { icon: 'ri-hand-heart-line' }, // Representa cuidado, relacionamento com cliente
-  to: 'pages-pricing',
-},
+  
+  // ✅ NOVO: Painel de Vendedores (diretor, supervisor, coordenador)
+  {
+    title: 'Vendedor',
+    icon: { icon: 'ri-briefcase-4-line' },
+    to: 'pages-icons',
+    action: 'manage',
+    subject: 'Vendedores',
+  },
+  
+  // ✅ NOVO: Gerenciamento de Clientes (diretor, supervisor)
+  {
+    title: 'Cliente',
+    icon: { icon: 'ri-hand-heart-line' },
+    to: 'pages-pricing',
+    action: 'manage',
+    subject: 'Clientes',
+  },
   // {
   //   title: 'Components',
   //   icon: { icon: 'ri-toggle-line' },

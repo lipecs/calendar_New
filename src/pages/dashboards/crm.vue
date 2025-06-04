@@ -651,8 +651,7 @@ onUnmounted(cleanup)
             </VRow>
           </VCardText>
         </VCard>
-      </VCol>
-
+      </VCol>     
       <!-- Análise de Capacidade -->
       <VCol cols="12" md="6">
         <VCard>

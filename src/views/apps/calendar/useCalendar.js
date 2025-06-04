@@ -275,7 +275,99 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     dayMaxEvents: 2,
     navLinks: true,
     locales: [ptBrLocale, enLocale],
-    locale: locale.value === 'pt' ? 'pt-br' : 'en-gb',
+    locale: 'pt-br', // ✅ AJUSTE: Força o locale português brasileiro
+    
+    // ✅ AJUSTE: Configurações de formatação de data brasileira
+    dayHeaderFormat: { weekday: 'short' }, // Seg, Ter, Qua...
+    eventTimeFormat: { // Formato de hora dos eventos
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false // Formato 24h
+    },
+    slotLabelFormat: { // Formato das horas na lateral
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    },
+    titleFormat: { // Formato do título do calendário
+      year: 'numeric',
+      month: 'long'
+    },
+    dayPopoverFormat: { // Formato do popup de dia
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    },
+    weekText: 'Semana',
+    allDayText: 'Todo o dia',
+    moreLinkText: 'mais',
+    noEventsText: 'Nenhum evento para exibir',
+    
+    // ✅ AJUSTE: Configuração específica para exibição de datas
+    displayEventTime: true, // Mostra horário dos eventos
+    displayEventEnd: true, // Mostra horário de fim
+    
+    // ✅ AJUSTE: Formatação customizada para diferentes visualizações
+    views: {
+      dayGridMonth: {
+        dayHeaderFormat: { weekday: 'short' }, // Seg, Ter, Qua
+        titleFormat: { year: 'numeric', month: 'long' }, // Janeiro 2024
+        dayCellContent: function(arg) {
+          return arg.dayNumberText; // Apenas o número do dia
+        }
+      },
+      timeGridWeek: {
+        dayHeaderFormat: function(date) {
+          const day = date.date.day.toString().padStart(2, '0');
+          const month = (date.date.month + 1).toString().padStart(2, '0');
+          const weekday = date.date.toLocaleDateString('pt-BR', { weekday: 'short' });
+          return `${weekday} ${day}/${month}`;
+        },
+        titleFormat: function(date) {
+          const start = date.start.date;
+          const end = date.end.date;  
+          const startDay = start.day.toString().padStart(2, '0');
+          const startMonth = (start.month + 1).toString().padStart(2, '0');
+          const endDay = end.day.toString().padStart(2, '0');
+          const endMonth = (end.month + 1).toString().padStart(2, '0');
+          return `${startDay}/${startMonth} - ${endDay}/${endMonth}/${start.year}`;
+        },
+        slotLabelFormat: {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }
+      },
+      timeGridDay: {
+        dayHeaderFormat: function(date) {
+          const day = date.date.day.toString().padStart(2, '0');
+          const month = (date.date.month + 1).toString().padStart(2, '0');
+          const year = date.date.year;
+          const weekday = date.date.toLocaleDateString('pt-BR', { weekday: 'long' });
+          return `${weekday}, ${day}/${month}/${year}`;
+        },
+        titleFormat: function(date) {
+          const day = date.date.day.toString().padStart(2, '0');
+          const month = (date.date.month + 1).toString().padStart(2, '0');
+          const year = date.date.year;
+          return `${day}/${month}/${year}`;
+        }
+      },
+      listMonth: {
+        dayHeaderFormat: function(date) {
+          const day = date.date.day.toString().padStart(2, '0');
+          const month = (date.date.month + 1).toString().padStart(2, '0');
+          const year = date.date.year;
+          const weekday = date.date.toLocaleDateString('pt-BR', { weekday: 'long' });
+          return `${weekday}, ${day}/${month}/${year}`;
+        },
+        eventTimeFormat: {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }
+      }
+    },
 
     eventClassNames({ event: calendarEvent }) {
       const calendarLabel = calendarEvent._def.extendedProps.calendar
@@ -373,9 +465,10 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     },
   })
 
+  // ✅ AJUSTE: Garante que o locale seja sempre pt-br
   watch(locale, newLocale => {
-    const fcLocale = newLocale === 'pt' ? 'pt-br' : 'en-gb'
-
+    const fcLocale = 'pt-br' // Sempre usar português brasileiro
+    
     if (calendarApi.value) {
       calendarApi.value.setOption('locale', fcLocale)
     }
@@ -391,6 +484,12 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
 
   onMounted(() => {
     calendarApi.value = refCalendar.value.getApi()
+    
+    // ✅ AJUSTE: Força configurações de localização após o mount
+    if (calendarApi.value) {
+      calendarApi.value.setOption('locale', 'pt-br')
+    }
+    
     setTimeout(() => {
       refetchEvents()
     }, 100)

@@ -1,6 +1,8 @@
+<!-- src/views/apps/user/admin/UserManagement.vue - ATUALIZADO -->
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import userService from '@/services/user';
+import authService from '@/services/auth';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -25,32 +27,79 @@ const userForm = ref({
   email: '',
   password: '',
   confirmPassword: '',
-  role: ['user'] // Default role
+  role: 'vendedor', // ✅ ATUALIZADO: Default para vendedor
+  supervisorId: null, // ✅ NOVO: ID do supervisor responsável
+  coordenadorId: null // ✅ NOVO: ID do coordenador responsável
 });
 
 // Erros de validação
 const formErrors = ref({});
 
-// Opções para o dropdown de papéis
-const roles = [
-  { title: t('Admin'), value: 'admin' },
-  { title: t('Usuário'), value: 'user' }
-];
+// ✅ ATUALIZADO: Opções de papéis hierárquicos
+const roles = computed(() => {
+  const currentUserLevel = authService.getHierarchyLevel();
+  const allRoles = [
+    { title: t('Diretor'), value: 'diretor', level: 4 },
+    { title: t('Supervisor'), value: 'supervisor', level: 3 },
+    { title: t('Coordenador'), value: 'coordenador', level: 2 },
+    { title: t('Vendedor'), value: 'vendedor', level: 1 }
+  ];
+  
+  // Permitir criar usuários apenas em níveis iguais ou inferiores
+  return allRoles.filter(role => role.level <= currentUserLevel);
+});
+
+// ✅ NOVO: Lista de supervisores para seleção
+const supervisors = computed(() => {
+  return users.value.filter(user => 
+    user.role === 'supervisor' || user.role === 'diretor'
+  );
+});
+
+// ✅ NOVO: Lista de coordenadores para seleção
+const coordenadores = computed(() => {
+  return users.value.filter(user => 
+    user.role === 'coordenador'
+  );
+});
 
 // Headers da tabela
 const headers = computed(() => [
   { title: t('Usuário'), key: 'username' },
   { title: t('Email'), key: 'email' },
   { title: t('Função'), key: 'role' },
+  { title: t('Supervisor'), key: 'supervisor' }, // ✅ NOVO
+  { title: t('Coordenador'), key: 'coordenador' }, // ✅ NOVO
   { title: t('Ações'), key: 'actions', sortable: false }
 ]);
 
-// Carrega a lista de usuários
+// ✅ ATUALIZADO: Carrega apenas usuários que o usuário atual pode ver
 const fetchUsers = async () => {
   try {
     isLoading.value = true;
     const data = await userService.getAllUsers();
-    users.value = data;
+    
+    // Filtrar usuários baseado na hierarquia
+    const currentUserLevel = authService.getHierarchyLevel();
+    const currentUser = authService.getCurrentUser();
+    
+    users.value = data.filter(user => {
+      // Admin e diretor veem todos
+      if (currentUserLevel >= 4) return true;
+      
+      // Supervisor vê coordenadores e vendedores sob sua responsabilidade
+      if (currentUserLevel === 3) {
+        return user.supervisorId === currentUser.userData.id || user.role === 'coordenador' || user.role === 'vendedor';
+      }
+      
+      // Coordenador vê apenas vendedores sob sua responsabilidade
+      if (currentUserLevel === 2) {
+        return user.coordenadorId === currentUser.userData.id && user.role === 'vendedor';
+      }
+      
+      return false;
+    });
+    
   } catch (error) {
     console.error('Erro ao buscar usuários:', error);
     showAlert('error', t('Erro ao carregar usuários') + ': ' + (error.response?.data?.message || error.message));
@@ -76,7 +125,9 @@ const openEditUserDrawer = (user) => {
     email: user.email,
     password: '',
     confirmPassword: '',
-    role: user.admin ? ['admin'] : ['user']
+    role: user.role,
+    supervisorId: user.supervisorId || null,
+    coordenadorId: user.coordenadorId || null
   };
 
   isUserDrawerOpen.value = true;
@@ -89,12 +140,14 @@ const resetForm = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: ['user']
+    role: 'vendedor',
+    supervisorId: null,
+    coordenadorId: null
   };
   formErrors.value = {};
 };
 
-// Validar formulário
+// ✅ ATUALIZADO: Validação com novos campos
 const validateForm = () => {
   const errors = {};
 
@@ -122,11 +175,20 @@ const validateForm = () => {
     errors.confirmPassword = t('As senhas não coincidem');
   }
 
+  // ✅ NOVO: Validações hierárquicas
+  if (userForm.value.role === 'vendedor' && !userForm.value.coordenadorId) {
+    errors.coordenadorId = t('Vendedor deve ter um coordenador');
+  }
+
+  if ((userForm.value.role === 'coordenador' || userForm.value.role === 'vendedor') && !userForm.value.supervisorId) {
+    errors.supervisorId = t('Este papel deve ter um supervisor');
+  }
+
   formErrors.value = errors;
   return Object.keys(errors).length === 0;
 };
 
-// Salvar usuário (criar ou atualizar)
+// ✅ ATUALIZADO: Salvar usuário com hierarquia
 const saveUser = async () => {
   if (!validateForm()) return;
 
@@ -136,7 +198,9 @@ const saveUser = async () => {
     const userData = {
       username: userForm.value.username,
       email: userForm.value.email,
-      role: userForm.value.role
+      role: userForm.value.role,
+      supervisorId: userForm.value.supervisorId,
+      coordenadorId: userForm.value.coordenadorId
     };
 
     if (userForm.value.password) {
@@ -177,6 +241,33 @@ const deleteUser = async (userId) => {
   } finally {
     isLoading.value = false;
   }
+};
+
+// ✅ NOVO: Obter nome do supervisor
+const getSupervisorName = (supervisorId) => {
+  if (!supervisorId) return t('Não atribuído');
+  const supervisor = users.value.find(u => u.id === supervisorId);
+  return supervisor ? supervisor.username : t('Não encontrado');
+};
+
+// ✅ NOVO: Obter nome do coordenador
+const getCoordenadorName = (coordenadorId) => {
+  if (!coordenadorId) return t('Não atribuído');
+  const coordenador = users.value.find(u => u.id === coordenadorId);
+  return coordenador ? coordenador.username : t('Não encontrado');
+};
+
+// ✅ NOVO: Cores dos papéis
+const getRoleColor = (role) => {
+  const colors = {
+    'admin': 'error',
+    'diretor': 'purple',
+    'supervisor': 'primary',
+    'coordenador': 'info',
+    'vendedor': 'success',
+    'user': 'secondary'
+  };
+  return colors[role] || 'secondary';
 };
 
 // Mostrar alerta
@@ -231,12 +322,22 @@ onMounted(() => {
         <!-- Template para a coluna role -->
         <template #item.role="{ item }">
           <VChip
-            :color="item.admin ? 'primary' : 'success'"
+            :color="getRoleColor(item.role)"
             size="small"
             class="text-capitalize"
           >
-            {{ item.admin ? $t('Admin') : $t('Usuário') }}
+            {{ $t(item.role) }}
           </VChip>
+        </template>
+        
+        <!-- ✅ NOVO: Template para supervisor -->
+        <template #item.supervisor="{ item }">
+          <span class="text-sm">{{ getSupervisorName(item.supervisorId) }}</span>
+        </template>
+        
+        <!-- ✅ NOVO: Template para coordenador -->
+        <template #item.coordenador="{ item }">
+          <span class="text-sm">{{ getCoordenadorName(item.coordenadorId) }}</span>
         </template>
         
         <!-- Template para a coluna de ações -->
@@ -259,7 +360,7 @@ onMounted(() => {
       v-model="isUserDrawerOpen"
       temporary
       location="end"
-      width="400"
+      width="500"
       class="scrollable-content"
     >
       <VToolbar color="primary">
@@ -303,8 +404,34 @@ onMounted(() => {
               :label="$t('Função')"
               item-title="title"
               item-value="value"
-              multiple
               class="mb-3"
+              :error-messages="formErrors.role"
+              required
+            />
+            
+            <!-- ✅ NOVO: Supervisor (se aplicável) -->
+            <VSelect
+              v-if="['coordenador', 'vendedor'].includes(userForm.role)"
+              v-model="userForm.supervisorId"
+              :items="supervisors"
+              :label="$t('Supervisor Responsável')"
+              item-title="username"
+              item-value="id"
+              class="mb-3"
+              :error-messages="formErrors.supervisorId"
+              required
+            />
+            
+            <!-- ✅ NOVO: Coordenador (apenas para vendedores) -->
+            <VSelect
+              v-if="userForm.role === 'vendedor'"
+              v-model="userForm.coordenadorId"
+              :items="coordenadores"
+              :label="$t('Coordenador Responsável')"
+              item-title="username"
+              item-value="id"
+              class="mb-3"
+              :error-messages="formErrors.coordenadorId"
               required
             />
             

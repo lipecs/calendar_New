@@ -1,9 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useTheme } from 'vuetify'
 import authService from '@/services/auth'
 import eventService from '@/services/event'
 import userService from '@/services/user'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useTheme } from 'vuetify'
 
 // Theme
 const { name: themeName } = useTheme()
@@ -795,7 +795,7 @@ onUnmounted(cleanup)
                     <div class="font-weight-medium mb-1">{{ week.date }}</div>
                     <div>{{ week.primaryLabel }}: {{ week.primaryValue }}{{ selectedWeekView === 'productivity' ? '%' :
                       ''
-                      }}</div>
+                    }}</div>
                     <div>{{ week.secondaryLabel }}: {{ week.secondaryValue }}{{ selectedWeekView === 'productivity' ?
                       '%' :
                       '' }}</div>

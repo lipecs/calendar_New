@@ -57,7 +57,7 @@ async getUserById(id) {
       
       // Preparar dados para o backend
       const payload = {
-        username: userData.username,
+        username: userData.username,      
         email: userData.email,
         admin: userData.role?.includes('admin') || false
       };

@@ -1,54 +1,110 @@
+// src/plugins/casl/ability.js - ATUALIZADO
 import { createMongoAbility } from '@casl/ability';
 import authService from '@/services/auth';
 
 // Cria a habilidade inicial vazia
 export const ability = createMongoAbility([]);
 
+// ✅ NOVO: Mapeamento de permissões por papel
+const getRoleAbilities = (role, userId) => {
+  const baseAbilities = [
+    { action: 'read', subject: 'Calendar' },
+    { action: 'manage', subject: 'Calendar', conditions: { userId } }
+  ];
+
+  switch (role) {
+    case 'admin':
+      return [
+        { action: 'manage', subject: 'all' },
+        { action: 'manage', subject: 'Users' },
+        { action: 'manage', subject: 'Vendedores' },
+        { action: 'manage', subject: 'Clientes' },
+        ...baseAbilities
+      ];
+
+    case 'diretor':
+      return [
+        { action: 'manage', subject: 'Users' },
+        { action: 'manage', subject: 'Vendedores' },
+        { action: 'manage', subject: 'Clientes' },
+        { action: 'read', subject: 'Reports' },
+        ...baseAbilities
+      ];
+
+    case 'supervisor':
+      return [
+        { action: 'read', subject: 'Users' },
+        { action: 'manage', subject: 'Vendedores' },
+        { action: 'manage', subject: 'Clientes' },
+        { action: 'read', subject: 'Reports' },
+        ...baseAbilities
+      ];
+
+    case 'coordenador':
+      return [
+        { action: 'read', subject: 'Users' },
+        { action: 'manage', subject: 'Vendedores' },
+        { action: 'read', subject: 'Clientes' },
+        ...baseAbilities
+      ];
+
+    case 'vendedor':
+      return [
+        { action: 'read', subject: 'Calendar' },
+        { action: 'manage', subject: 'Calendar', conditions: { userId } },
+        { action: 'read', subject: 'Clientes', conditions: { vendedorId: userId } }
+      ];
+
+    case 'user':
+    default:
+      return baseAbilities;
+  }
+};
+
 // Inicializa as regras de habilidade com base no usuário
 export const initializeAbility = () => {
   try {
     const userData = authService.getCurrentUser();
     
-    // ✅ CORREÇÃO: Se não houver dados do usuário, dar habilidades básicas
-    if (!userData) {
-      return createMongoAbility([]);
+    if (!userData || !userData.userData) {
+      return createMongoAbility([
+        { action: 'read', subject: 'Calendar' },
+        { action: 'manage', subject: 'Calendar' }
+      ]);
     }
+
+    const role = userData.userData.role || 'user';
+    const userId = userData.userData.id;
     
-    // ✅ CORREÇÃO: Dar habilidades básicas para todos os usuários autenticados
-    let basicAbilities = [
-      { action: 'read', subject: 'Calendar' },
-      { action: 'manage', subject: 'Calendar' },
-    ];
+    // ✅ NOVO: Obter habilidades baseadas no papel
+    const roleAbilities = getRoleAbilities(role, userId);
     
-    // ✅ NOVO: Se for admin, adicionar permissões administrativas
-    const isAdmin = userData.roles && userData.roles.includes('ROLE_ADMIN');
-    if (isAdmin) {
-      basicAbilities.push(
-        { action: 'manage', subject: 'Users' },
-        { action: 'read', subject: 'Users' },
-        { action: 'manage', subject: 'all' }
-      );
-    }
-    
-    // ✅ CORREÇÃO: Se tem userAbilityRules, adicionar às básicas (não substituir)
+    // Combinar com abilities do servidor se existirem
     if (userData.userAbilityRules && Array.isArray(userData.userAbilityRules)) {
-      const userAbilities = userData.userAbilityRules.map(rule => ({
+      const serverAbilities = userData.userAbilityRules.map(rule => ({
         action: rule.action,
         subject: rule.subject,
-        // Adicionar conditions para usuários comuns
-        ...(rule.subject === 'Calendar' && rule.action === 'manage' && !isAdmin 
-          ? { conditions: { userId: userData.id } } 
-          : {})
+        ...(rule.conditions ? { conditions: rule.conditions } : {})
       }));
       
-      // Combinar abilities básicas com as do servidor
-      basicAbilities = [...basicAbilities, ...userAbilities];
+      // Mesclar sem duplicar
+      const combinedAbilities = [...roleAbilities];
+      serverAbilities.forEach(serverRule => {
+        const exists = combinedAbilities.some(roleRule => 
+          roleRule.action === serverRule.action && 
+          roleRule.subject === serverRule.subject
+        );
+        if (!exists) {
+          combinedAbilities.push(serverRule);
+        }
+      });
+      
+      return createMongoAbility(combinedAbilities);
     }
     
-    return createMongoAbility(basicAbilities);
+    return createMongoAbility(roleAbilities);
   } catch (error) {
     console.error('Erro ao inicializar habilidades:', error);
-    // ✅ FALLBACK: Sempre dar acesso ao Calendar
     return createMongoAbility([
       { action: 'read', subject: 'Calendar' },
       { action: 'manage', subject: 'Calendar' }
@@ -61,8 +117,7 @@ export const updateAbility = () => {
   try {
     const userData = authService.getCurrentUser();
     
-    // ✅ CORREÇÃO: Se não há dados, limpar mas manter Calendar
-    if (!userData) {
+    if (!userData || !userData.userData) {
       ability.update([
         { action: 'read', subject: 'Calendar' },
         { action: 'manage', subject: 'Calendar' }
@@ -70,10 +125,7 @@ export const updateAbility = () => {
       return ability;
     }
     
-    // ✅ CORREÇÃO: Usar initializeAbility que já tem toda a lógica
     const newAbility = initializeAbility();
-    
-    // Limpa e adiciona as novas regras
     ability.update(newAbility.rules);
     
     // Salva no cookie para persistência
@@ -87,12 +139,24 @@ export const updateAbility = () => {
     return ability;
   } catch (error) {
     console.error('Erro ao atualizar habilidades:', error);
-    // ✅ FALLBACK: Sempre dar acesso ao Calendar
     ability.update([
       { action: 'read', subject: 'Calendar' },
       { action: 'manage', subject: 'Calendar' }
     ]);
     return ability;
+  }
+};
+
+// ✅ NOVO: Função auxiliar para verificar permissões específicas
+export const canAccess = (action, subject, conditions = null) => {
+  try {
+    if (conditions) {
+      return ability.can(action, subject, conditions);
+    }
+    return ability.can(action, subject);
+  } catch (error) {
+    console.error('Erro ao verificar permissão:', error);
+    return false;
   }
 };
 

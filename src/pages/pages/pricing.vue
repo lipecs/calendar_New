@@ -1,8 +1,10 @@
+<!-- src/pages/pages/pricing.vue - ATUALIZADO para Gerenciamento de Clientes -->
 <template>
   <VCard>
     <VCardTitle class="d-flex justify-space-between align-center flex-wrap">
       {{ $t('Gerenciamento de Clientes') }}
       <VBtn 
+        v-if="canManageClients"
         color="primary" 
         prepend-icon="ri-user-add-line" 
         @click="openAddClientDialog"
@@ -26,22 +28,26 @@
             @input="searchClients"
           />
         </VCol>
+        <!-- ✅ NOVO: Filtro por coordenador -->
         <VCol cols="12" md="3">
           <VSelect
-            v-model="filterByUser"
-            :label="$t('Filtrar por Usuário')"
-            :items="availableUsers"
+            v-model="filterByCoordenador"
+            :label="$t('Filtrar por Coordenador')"
+            :items="availableCoordenadores"
             item-title="username"
             item-value="id"
             clearable
             @update:model-value="filterClients"
           />
         </VCol>
+        <!-- ✅ NOVO: Filtro por vendedor -->
         <VCol cols="12" md="3">
           <VSelect
-            v-model="filterByStatus"
-            :label="$t('Status')"
-            :items="statusOptions"
+            v-model="filterByVendedor"
+            :label="$t('Filtrar por Vendedor')"
+            :items="availableVendedores"
+            item-title="username"
+            item-value="id"
             clearable
             @update:model-value="filterClients"
           />
@@ -81,18 +87,38 @@
           </VChip>
         </template>
         
-        <!-- Usuário Responsável -->
-        <template #item.assignedUser="{ item }">
-          <div v-if="item.assignedUser" class="d-flex align-center">
+        <!-- ✅ ATUALIZADO: Coordenador Responsável -->
+        <template #item.coordenador="{ item }">
+          <div v-if="item.coordenador" class="d-flex align-center">
+            <VAvatar size="32" class="me-2">
+              <VIcon icon="ri-user-settings-line" />
+            </VAvatar>
+            <div>
+              <div class="text-body-2 font-weight-medium">
+                {{ item.coordenador.username }}
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                {{ item.coordenador.email }}
+              </div>
+            </div>
+          </div>
+          <VChip v-else color="warning" size="small">
+            {{ $t('Não Atribuído') }}
+          </VChip>
+        </template>
+        
+        <!-- ✅ ATUALIZADO: Vendedor Responsável -->
+        <template #item.vendedor="{ item }">
+          <div v-if="item.vendedor" class="d-flex align-center">
             <VAvatar size="32" class="me-2">
               <VIcon icon="ri-user-line" />
             </VAvatar>
             <div>
               <div class="text-body-2 font-weight-medium">
-                {{ item.assignedUser.username }}
+                {{ item.vendedor.username }}
               </div>
               <div class="text-caption text-medium-emphasis">
-                {{ item.assignedUser.email }}
+                {{ item.vendedor.email }}
               </div>
             </div>
           </div>
@@ -112,6 +138,7 @@
             <VTooltip text="Editar Cliente">
               <template #activator="{ props }">
                 <IconBtn 
+                  v-if="canManageClients"
                   v-bind="props"
                   @click="editClient(item)"
                 >
@@ -120,20 +147,10 @@
               </template>
             </VTooltip>
             
-            <VTooltip text="Atribuir Usuário">
-              <template #activator="{ props }">
-                <IconBtn 
-                  v-bind="props"
-                  @click="openAssignUserDialog(item)"
-                >
-                  <VIcon icon="ri-user-settings-line" />
-                </IconBtn>
-              </template>
-            </VTooltip>
-            
             <VTooltip text="Excluir Cliente">
               <template #activator="{ props }">
                 <IconBtn 
+                  v-if="canManageClients"
                   v-bind="props"
                   color="error" 
                   @click="confirmDeleteClient(item)"
@@ -150,7 +167,7 @@
     <!-- Dialog para Adicionar/Editar Cliente -->
     <VDialog 
       v-model="clientDialog" 
-      max-width="600px"
+      max-width="700px"
       persistent
     >
       <VCard>
@@ -205,6 +222,32 @@
                 />
               </VCol>
               
+              <!-- ✅ NOVO: Coordenador Responsável -->
+              <VCol cols="12" md="6">
+                <VSelect
+                  v-model="clientData.coordenadorId"
+                  :label="$t('Coordenador Responsável')"
+                  :items="availableCoordenadores"
+                  item-title="username"
+                  item-value="id"
+                  :rules="[v => !!v || $t('Coordenador é obrigatório')]"
+                  required
+                />
+              </VCol>
+              
+              <!-- ✅ NOVO: Vendedor Responsável -->
+              <VCol cols="12" md="6">
+                <VSelect
+                  v-model="clientData.vendedorId"
+                  :label="$t('Vendedor Responsável')"
+                  :items="availableVendedores"
+                  item-title="username"
+                  item-value="id"
+                  :rules="[v => !!v || $t('Vendedor é obrigatório')]"
+                  required
+                />
+              </VCol>
+              
               <VCol cols="12">
                 <VTextarea
                   v-model="clientData.address"
@@ -239,66 +282,6 @@
             @click="saveClient"
           >
             {{ isEditMode ? $t('Atualizar') : $t('Salvar') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-    
-    <!-- Dialog para Atribuir Usuário -->
-    <VDialog 
-      v-model="assignUserDialog" 
-      max-width="500px"
-      persistent
-    >
-      <VCard>
-        <VCardTitle class="text-h5">
-          {{ $t('Atribuir Usuário ao Cliente') }}
-        </VCardTitle>
-        
-        <VCardText>
-          <div class="mb-4">
-            <h6 class="text-h6 mb-2">{{ $t('Cliente') }}:</h6>
-            <p class="text-body-1">{{ selectedClient?.name }} ({{ selectedClient?.code }})</p>
-          </div>
-          
-          <VSelect
-            v-model="selectedUserId"
-            :label="$t('Selecionar Usuário')"
-            :items="availableUsers"
-            item-title="username"
-            item-value="id"
-            clearable
-            :rules="[v => !!v || $t('Usuário é obrigatório')]"
-          >
-            <template #item="{ item, props }">
-              <VListItem v-bind="props">
-                <template #prepend>
-                  <VAvatar size="32">
-                    <VIcon icon="ri-user-line" />
-                  </VAvatar>
-                </template>
-                <VListItemTitle>{{ item.raw.username }}</VListItemTitle>
-                <VListItemSubtitle>{{ item.raw.email }}</VListItemSubtitle>
-              </VListItem>
-            </template>
-          </VSelect>
-        </VCardText>
-        
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            color="secondary"
-            variant="outlined"
-            @click="closeAssignUserDialog"
-          >
-            {{ $t('Cancelar') }}
-          </VBtn>
-          <VBtn
-            color="primary"
-            :loading="isLoading"
-            @click="assignUserToClient"
-          >
-            {{ $t('Atribuir') }}
           </VBtn>
         </VCardActions>
       </VCard>
@@ -346,24 +329,29 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import authService from '@/services/auth';
+import userService from '@/services/user';
 
 const { t } = useI18n();
+
+// ✅ NOVO: Verificações de permissão
+const canManageClients = computed(() => authService.canManageClientes());
 
 // Estados reativos
 const clients = ref([]);
 const filteredClients = ref([]);
-const availableUsers = ref([]);
+const availableCoordenadores = ref([]);
+const availableVendedores = ref([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
-const filterByUser = ref(null);
-const filterByStatus = ref(null);
+const filterByCoordenador = ref(null);
+const filterByVendedor = ref(null);
 
 // Dialogs
 const clientDialog = ref(false);
-const assignUserDialog = ref(false);
 const deleteDialog = ref(false);
 
-// Dados do cliente
+// ✅ ATUALIZADO: Dados do cliente com coordenador e vendedor
 const clientData = ref({
   name: '',
   code: '',
@@ -371,11 +359,11 @@ const clientData = ref({
   phone: '',
   address: '',
   notes: '',
-  status: 'Ativo'
+  status: 'Ativo',
+  coordenadorId: null,
+  vendedorId: null
 });
 
-const selectedClient = ref(null);
-const selectedUserId = ref(null);
 const clientToDelete = ref(null);
 const isEditMode = ref(false);
 
@@ -386,14 +374,15 @@ const alert = ref({
   message: ''
 });
 
-// Configurações da tabela
+// ✅ ATUALIZADO: Configurações da tabela
 const headers = [
   { title: t('Nome'), key: 'name', sortable: true },
   { title: t('Código'), key: 'code', sortable: true },
   { title: t('Email'), key: 'email', sortable: true },
   { title: t('Telefone'), key: 'phone', sortable: false },
   { title: t('Status'), key: 'status', sortable: true },
-  { title: t('Usuário Responsável'), key: 'assignedUser', sortable: false },
+  { title: t('Coordenador'), key: 'coordenador', sortable: false },
+  { title: t('Vendedor'), key: 'vendedor', sortable: false },
   { title: t('Criado em'), key: 'createdAt', sortable: true },
   { title: t('Ações'), key: 'actions', sortable: false }
 ];
@@ -405,11 +394,39 @@ const statusOptions = [
   { title: t('Bloqueado'), value: 'Bloqueado' }
 ];
 
+// ✅ NOVO: Carregar coordenadores e vendedores
+const loadUsers = async () => {
+  try {
+    const users = await userService.getAllUsers();
+    
+    // Filtrar coordenadores e vendedores baseado na hierarquia
+    const currentUser = authService.getCurrentUser();
+    const currentUserLevel = authService.getHierarchyLevel();
+    
+    if (currentUserLevel >= 4) {
+      // Admin/Diretor vê todos
+      availableCoordenadores.value = users.filter(u => u.role === 'coordenador');
+      availableVendedores.value = users.filter(u => u.role === 'vendedor');
+    } else if (currentUserLevel === 3) {
+      // Supervisor vê seus subordinados
+      availableCoordenadores.value = users.filter(u => 
+        u.role === 'coordenador' && u.supervisorId === currentUser.userData.id
+      );
+      availableVendedores.value = users.filter(u => 
+        u.role === 'vendedor' && u.supervisorId === currentUser.userData.id
+      );
+    }
+  } catch (error) {
+    showAlert('error', t('Erro ao carregar usuários'));
+  }
+};
+
 // Métodos
 const loadClients = async () => {
   try {
     isLoading.value = true;
-    // Simulação de dados - substituir pela chamada à API
+    
+    // ✅ SIMULAÇÃO: Dados mockados com relacionamentos
     clients.value = [
       {
         id: 1,
@@ -420,7 +437,10 @@ const loadClients = async () => {
         address: 'Rua das Flores, 123',
         notes: 'Cliente importante',
         status: 'Ativo',
-        assignedUser: { id: 1, username: 'vendedor1', email: 'vendedor1@empresa.com' },
+        coordenadorId: 1,
+        vendedorId: 2,
+        coordenador: { id: 1, username: 'coordenador1', email: 'coord1@empresa.com' },
+        vendedor: { id: 2, username: 'vendedor1', email: 'vend1@empresa.com' },
         createdAt: new Date('2024-01-15')
       },
       {
@@ -432,29 +452,38 @@ const loadClients = async () => {
         address: 'Av. Principal, 456',
         notes: '',
         status: 'Prospecto',
-        assignedUser: null,
+        coordenadorId: 1,
+        vendedorId: null,
+        coordenador: { id: 1, username: 'coordenador1', email: 'coord1@empresa.com' },
+        vendedor: null,
         createdAt: new Date('2024-02-10')
       }
     ];
+    
+    // ✅ FILTRAR: Clientes baseado na hierarquia do usuário
+    const currentUser = authService.getCurrentUser();
+    const currentUserLevel = authService.getHierarchyLevel();
+    
+    if (currentUserLevel < 3) {
+      // Coordenador vê apenas clientes atribuídos a ele
+      if (currentUserLevel === 2) {
+        clients.value = clients.value.filter(client => 
+          client.coordenadorId === currentUser.userData.id
+        );
+      }
+      // Vendedor vê apenas clientes atribuídos a ele
+      else if (currentUserLevel === 1) {
+        clients.value = clients.value.filter(client => 
+          client.vendedorId === currentUser.userData.id
+        );
+      }
+    }
     
     filteredClients.value = [...clients.value];
   } catch (error) {
     showAlert('error', t('Erro ao carregar clientes'));
   } finally {
     isLoading.value = false;
-  }
-};
-
-const loadUsers = async () => {
-  try {
-    // Simulação de dados - substituir pela chamada à API
-    availableUsers.value = [
-      { id: 1, username: 'vendedor1', email: 'vendedor1@empresa.com' },
-      { id: 2, username: 'vendedor2', email: 'vendedor2@empresa.com' },
-      { id: 3, username: 'coordenador1', email: 'coord1@empresa.com' }
-    ];
-  } catch (error) {
-    showAlert('error', t('Erro ao carregar usuários'));
   }
 };
 
@@ -475,16 +504,18 @@ const filterClients = () => {
     );
   }
   
-  // Filtro por usuário
-  if (filterByUser.value) {
+  // Filtro por coordenador
+  if (filterByCoordenador.value) {
     filtered = filtered.filter(client => 
-      client.assignedUser && client.assignedUser.id === filterByUser.value
+      client.coordenadorId === filterByCoordenador.value
     );
   }
   
-  // Filtro por status
-  if (filterByStatus.value) {
-    filtered = filtered.filter(client => client.status === filterByStatus.value);
+  // Filtro por vendedor
+  if (filterByVendedor.value) {
+    filtered = filtered.filter(client => 
+      client.vendedorId === filterByVendedor.value
+    );
   }
   
   filteredClients.value = filtered;
@@ -499,7 +530,9 @@ const openAddClientDialog = () => {
     phone: '',
     address: '',
     notes: '',
-    status: 'Ativo'
+    status: 'Ativo',
+    coordenadorId: null,
+    vendedorId: null
   };
   clientDialog.value = true;
 };
@@ -519,7 +552,9 @@ const closeClientDialog = () => {
     phone: '',
     address: '',
     notes: '',
-    status: 'Ativo'
+    status: 'Ativo',
+    coordenadorId: null,
+    vendedorId: null
   };
 };
 
@@ -532,6 +567,10 @@ const saveClient = async () => {
       throw new Error(t('Nome e código são obrigatórios'));
     }
     
+    if (!clientData.value.coordenadorId || !clientData.value.vendedorId) {
+      throw new Error(t('Coordenador e vendedor são obrigatórios'));
+    }
+    
     // Verificar se código já existe (apenas para novos clientes)
     if (!isEditMode.value) {
       const existingClient = clients.value.find(c => c.code === clientData.value.code);
@@ -540,11 +579,19 @@ const saveClient = async () => {
       }
     }
     
+    // Buscar dados do coordenador e vendedor
+    const coordenador = availableCoordenadores.value.find(c => c.id === clientData.value.coordenadorId);
+    const vendedor = availableVendedores.value.find(v => v.id === clientData.value.vendedorId);
+    
     if (isEditMode.value) {
       // Atualizar cliente existente
       const index = clients.value.findIndex(c => c.id === clientData.value.id);
       if (index !== -1) {
-        clients.value[index] = { ...clientData.value };
+        clients.value[index] = { 
+          ...clientData.value,
+          coordenador,
+          vendedor
+        };
         showAlert('success', t('Cliente atualizado com sucesso'));
       }
     } else {
@@ -553,7 +600,8 @@ const saveClient = async () => {
         ...clientData.value,
         id: Date.now(), // Simulação de ID
         createdAt: new Date(),
-        assignedUser: null
+        coordenador,
+        vendedor
       };
       clients.value.push(newClient);
       showAlert('success', t('Cliente adicionado com sucesso'));
@@ -563,38 +611,6 @@ const saveClient = async () => {
     closeClientDialog();
   } catch (error) {
     showAlert('error', error.message);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const openAssignUserDialog = (client) => {
-  selectedClient.value = client;
-  selectedUserId.value = client.assignedUser ? client.assignedUser.id : null;
-  assignUserDialog.value = true;
-};
-
-const closeAssignUserDialog = () => {
-  assignUserDialog.value = false;
-  selectedClient.value = null;
-  selectedUserId.value = null;
-};
-
-const assignUserToClient = async () => {
-  try {
-    isLoading.value = true;
-    
-    const clientIndex = clients.value.findIndex(c => c.id === selectedClient.value.id);
-    if (clientIndex !== -1) {
-      const user = availableUsers.value.find(u => u.id === selectedUserId.value);
-      clients.value[clientIndex].assignedUser = user || null;
-      
-      showAlert('success', t('Usuário atribuído com sucesso'));
-      filterClients();
-      closeAssignUserDialog();
-    }
-  } catch (error) {
-    showAlert('error', t('Erro ao atribuir usuário'));
   } finally {
     isLoading.value = false;
   }
@@ -653,8 +669,8 @@ const showAlert = (type, message) => {
 
 // Lifecycle
 onMounted(() => {
-  loadClients();
   loadUsers();
+  loadClients();
 });
 </script>
 

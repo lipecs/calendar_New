@@ -1,3 +1,4 @@
+// src/services/auth.js - ATUALIZADO
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8080/api/auth/';
@@ -11,7 +12,6 @@ class AuthService {
       });
       
       if (response.data.accessToken) {
-        // ✅ NOVO: Armazenar no formato padrão
         const userData = {
           accessToken: response.data.accessToken,
           userData: response.data.userData,
@@ -20,7 +20,6 @@ class AuthService {
         
         localStorage.setItem('user', JSON.stringify(userData));
         
-        // Configurar headers para axios 
         this.setAuthHeader(response.data.accessToken);
         this.setUserHeaders(response.data.userData);
       }
@@ -50,8 +49,21 @@ class AuthService {
   setUserHeaders(userData) {
     if (userData && userData.id) {
       axios.defaults.headers.common['X-User-Id'] = userData.id.toString();
-      axios.defaults.headers.common['X-User-Role'] = userData.role === 'admin' ? 'ADMIN' : 'USER';
+      axios.defaults.headers.common['X-User-Role'] = this.getUserRoleHeader(userData.role);
     }
+  }
+
+  // ✅ NOVO: Método para converter role para header
+  getUserRoleHeader(role) {
+    const roleMap = {
+      'admin': 'ADMIN',
+      'diretor': 'DIRETOR',
+      'supervisor': 'SUPERVISOR', 
+      'coordenador': 'COORDENADOR',
+      'vendedor': 'VENDEDOR',
+      'user': 'USER'
+    };
+    return roleMap[role] || 'USER';
   }
 
   isAuthenticated() {
@@ -74,31 +86,93 @@ class AuthService {
     }
   }
 
+  // ✅ ATUALIZADO: Verificação de admin incluindo diretor
   isAdmin() {
     const user = this.getCurrentUser();
-    return user && user.userData && user.userData.role === 'admin';
+    return user && user.userData && (user.userData.role === 'admin' || user.userData.role === 'diretor');
+  }
+
+  // ✅ NOVO: Verificações específicas de papéis
+  isDiretor() {
+    const user = this.getCurrentUser();
+    return user && user.userData && user.userData.role === 'diretor';
+  }
+
+  isSupervisor() {
+    const user = this.getCurrentUser();
+    return user && user.userData && user.userData.role === 'supervisor';
+  }
+
+  isCoordenador() {
+    const user = this.getCurrentUser();
+    return user && user.userData && user.userData.role === 'coordenador';
+  }
+
+  isVendedor() {
+    const user = this.getCurrentUser();
+    return user && user.userData && user.userData.role === 'vendedor';
+  }
+
+  // ✅ NOVO: Verificar se pode gerenciar vendedores
+  canManageVendedores() {
+    const user = this.getCurrentUser();
+    if (!user || !user.userData) return false;
+    
+    const role = user.userData.role;
+    return ['admin', 'diretor', 'supervisor', 'coordenador'].includes(role);
+  }
+
+  // ✅ NOVO: Verificar se pode cadastrar clientes
+  canManageClientes() {
+    const user = this.getCurrentUser();
+    if (!user || !user.userData) return false;
+    
+    const role = user.userData.role;
+    return ['admin', 'diretor', 'supervisor'].includes(role);
+  }
+
+  // ✅ NOVO: Verificar se pode criar agendamentos para outros
+  canCreateAgendamentosForOthers() {
+    const user = this.getCurrentUser();
+    if (!user || !user.userData) return false;
+    
+    const role = user.userData.role;
+    return ['admin', 'diretor', 'supervisor', 'coordenador'].includes(role);
+  }
+
+  // ✅ NOVO: Obter nível hierárquico
+  getHierarchyLevel() {
+    const user = this.getCurrentUser();
+    if (!user || !user.userData) return 0;
+    
+    const levels = {
+      'admin': 5,
+      'diretor': 4,
+      'supervisor': 3,
+      'coordenador': 2,
+      'vendedor': 1,
+      'user': 0
+    };
+    
+    return levels[user.userData.role] || 0;
   }
 
   getUserAbilities() {
     const user = this.getCurrentUser();
     if (!user || !user.userAbilityRules) return [];
 
-    // ✅ NOVO: Usar as abilities que vêm do backend
     return user.userAbilityRules.map(rule => ({
       action: rule.action,
       subject: rule.subject,
-      // Adicionar conditions para usuários comuns
-      ...(rule.subject === 'Calendar' && rule.action === 'manage' && user.userData.role !== 'admin' 
+      ...(rule.subject === 'Calendar' && rule.action === 'manage' && !this.isAdmin() 
         ? { conditions: { userId: user.userData.id } } 
         : {})
     }));
   }
 }
 
-// Instância singleton
 const authService = new AuthService();
 
-// Inicializa o token de autenticação se o usuário estiver logado
 const user = authService.getCurrentUser();
 if (user && user.accessToken) {
   authService.setAuthHeader(user.accessToken);
