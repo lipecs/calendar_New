@@ -23,6 +23,9 @@ export const blankEvent = {
     guests: [],
     location: '',
     status: 'In Progress',
+    clienteId: null,
+    cliente: '',
+    assignedUser: null
   },
 }
 
@@ -37,12 +40,21 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
   const extractEventDataFromEventApi = eventApi => {
     const {
       id, title, start, end, url, description, allDay,
-      extendedProps: { calendar, guests, location, status },
+      extendedProps: { calendar, guests, location, status, clienteId, cliente, assignedUser },
     } = eventApi
 
     return {
       id, title, start, end, url, description, allDay,
-      extendedProps: { calendar, guests, location, status },
+      extendedProps: { 
+        calendar, guests, location, status, 
+        clienteId: clienteId || null, 
+        cliente: cliente || '', 
+        assignedUser: assignedUser || null 
+      },
+      // ✅ NOVO: Garantir campos do backend
+      userId: eventApi.userId || eventApi.extendedProps?.userId,
+      clientId: clienteId || null,
+      assignedUserId: assignedUser || null
     }
   }
 
@@ -104,7 +116,7 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     })
   }
 
-  // ✅ CORRIGIDO: Buscar eventos com controle de usuário
+  // ✅ CORRIGIDO: Buscar eventos com controle aprimorado de usuário
   const fetchEvents = (info, successCallback) => {
     if (!info) return
 
@@ -114,28 +126,29 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     const currentUser = authService.getCurrentUser()
     const isAdmin = authService.isAdmin()
     const isDiretor = authService.isDiretor()
+    const isSupervisor = authService.isSupervisor()
+    const isCoordenador = authService.isCoordenador()
 
     // ✅ CORRIGIDO: Verificar se há um usuário selecionado globalmente
     let selectedUserId = null;
 
-    // Verificar múltiplas formas de obter o usuário selecionado
+    // Para admins e diretores, verificar seleção de usuário específico
     if (isAdmin || isDiretor) {
-      // Prioridade: window.selectedUserId (seleção no dropdown)
       if (window.selectedUserId) {
         selectedUserId = window.selectedUserId;
-        console.log('👤 Usando usuário selecionado do dropdown:', selectedUserId);
+        console.log('👤 Admin/Diretor visualizando usuário específico:', selectedUserId);
+      } else {
+        console.log('👥 Admin/Diretor visualizando todos os eventos');
+        selectedUserId = null;
       }
-      // Alternativa: prop selectedUserId
-      else if (window.calendarSelectedUserId) {
-        selectedUserId = window.calendarSelectedUserId;
-        console.log('👤 Usando usuário selecionado da prop:', selectedUserId);
-      }
-      else {
-        console.log('👥 Admin/Diretor visualizando todos os eventos (nenhum usuário específico selecionado)');
-        selectedUserId = null; // Ver todos os eventos
-      }
-    } else {
-      // Usuário comum sempre vê apenas seus próprios eventos
+    } 
+    // Supervisores e coordenadores veem sua equipe (sem filtro específico)
+    else if (isSupervisor || isCoordenador) {
+      console.log('👥 Supervisor/Coordenador visualizando eventos da equipe');
+      selectedUserId = null; // O store vai filtrar por hierarquia
+    } 
+    // Usuários comuns sempre veem apenas seus próprios eventos
+    else {
       selectedUserId = currentUser?.userData?.id;
       console.log('👤 Usuário comum visualizando próprios eventos:', selectedUserId);
     }
@@ -144,9 +157,10 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
       currentUserId: currentUser?.userData?.id,
       isAdmin,
       isDiretor,
+      isSupervisor,
+      isCoordenador,
       selectedUserId,
-      windowSelectedUserId: window.selectedUserId,
-      windowCalendarSelectedUserId: window.calendarSelectedUserId
+      windowSelectedUserId: window.selectedUserId
     });
 
     store.fetchEvents(selectedUserId)
@@ -159,21 +173,50 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
           return;
         }
 
-        // ✅ CORRIGIDO: Mapear eventos para o formato do FullCalendar
+        // ✅ CORRIGIDO: Processar eventos para o FullCalendar
         const formattedEvents = events.map(e => {
+          // ✅ CORRIGIDO: Garantir que as datas são objetos Date
+          let startDate = e.start;
+          let endDate = e.end;
+          
+          if (typeof startDate === 'string') {
+            startDate = new Date(startDate);
+          }
+          if (typeof endDate === 'string') {
+            endDate = new Date(endDate);
+          }
+
           const formattedEvent = {
             ...e,
-            start: new Date(e.start),
-            end: new Date(e.end),
+            start: startDate,
+            end: endDate,
+            
+            // ✅ CORRIGIDO: Garantir que extendedProps está completo
+            extendedProps: {
+              calendar: e.extendedProps?.calendar || 'Meeting',
+              location: e.extendedProps?.location || '',
+              status: e.extendedProps?.status || 'In Progress',
+              guests: e.extendedProps?.guests || [],
+              
+              // ✅ NOVO: Dados específicos do sistema
+              clienteId: e.extendedProps?.clienteId || e.clientId || null,
+              cliente: e.extendedProps?.cliente || '',
+              clienteCode: e.extendedProps?.clienteCode || '',
+              assignedUser: e.extendedProps?.assignedUser || e.assignedUserId || null,
+              
+              // ✅ NOVO: Campos para compatibilidade
+              userId: e.userId,
+              assignedUserId: e.assignedUserId || null
+            }
           };
 
-          console.log('📝 Evento formatado:', {
+          console.log('📝 Evento formatado para FullCalendar:', {
             id: formattedEvent.id,
             title: formattedEvent.title,
-            start: formattedEvent.start,
-            end: formattedEvent.end,
             userId: formattedEvent.userId,
-            client: formattedEvent.extendedProps?.cliente
+            clienteId: formattedEvent.extendedProps.clienteId,
+            assignedUser: formattedEvent.extendedProps.assignedUser,
+            client: formattedEvent.extendedProps.cliente
           });
 
           return formattedEvent;
@@ -241,13 +284,26 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
 
   watch(() => [...store.selectedCalendars], refetchEvents, { deep: true })
 
+  // ✅ CORRIGIDO: Adicionar evento com dados completos
   const addEvent = _event => {
+    console.log('📝 useCalendar.addEvent chamado com:', _event);
+
+    // ✅ CORRIGIDO: Garantir que extendedProps existe e está completo
     if (!_event.extendedProps) {
       _event.extendedProps = {}
     }
     
     if (!_event.extendedProps.status) {
       _event.extendedProps.status = 'In Progress'
+    }
+
+    // ✅ CORRIGIDO: Garantir que campos de cliente e vendedor estão mapeados
+    if (_event.extendedProps.clienteId && !_event.clientId) {
+      _event.clientId = parseInt(_event.extendedProps.clienteId);
+    }
+    
+    if (_event.extendedProps.assignedUser && !_event.assignedUserId) {
+      _event.assignedUserId = parseInt(_event.extendedProps.assignedUser);
     }
 
     const status = _event.extendedProps.status
@@ -272,16 +328,36 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
       _event.description = ''
     }
 
-    store.addEvent(_event).then(refetchEvents)
+    console.log('🚀 Enviando evento para store:', _event);
+
+    store.addEvent(_event).then(() => {
+      console.log('✅ Evento adicionado, atualizando calendário');
+      refetchEvents();
+    }).catch(error => {
+      console.error('❌ Erro ao adicionar evento:', error);
+    });
   }
 
+  // ✅ CORRIGIDO: Atualizar evento com dados completos
   const updateEvent = _event => {
+    console.log('📝 useCalendar.updateEvent chamado com:', _event);
+
+    // ✅ CORRIGIDO: Garantir que extendedProps existe e está completo
     if (!_event.extendedProps) {
       _event.extendedProps = {}
     }
     
     if (!_event.extendedProps.status) {
       _event.extendedProps.status = 'In Progress'
+    }
+
+    // ✅ CORRIGIDO: Garantir que campos de cliente e vendedor estão mapeados
+    if (_event.extendedProps.clienteId && !_event.clientId) {
+      _event.clientId = parseInt(_event.extendedProps.clienteId);
+    }
+    
+    if (_event.extendedProps.assignedUser && !_event.assignedUserId) {
+      _event.assignedUserId = parseInt(_event.extendedProps.assignedUser);
     }
 
     const status = _event.extendedProps.status
@@ -302,14 +378,26 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
       }
     }
 
+    console.log('🚀 Enviando atualização para store:', _event);
+
     store.updateEvent(_event).then(r => {
-      updateEventInCalendar(r, ['id', 'title', 'url', 'description'], ['calendar', 'guests', 'location', 'status'])
-      refetchEvents()
-    })
+      console.log('✅ Evento atualizado, atualizando interface');
+      updateEventInCalendar(r, ['id', 'title', 'url', 'description'], ['calendar', 'guests', 'location', 'status', 'clienteId', 'cliente', 'assignedUser'])
+      refetchEvents();
+    }).catch(error => {
+      console.error('❌ Erro ao atualizar evento:', error);
+    });
   }
 
   const removeEvent = eventId => {
-    store.removeEvent(eventId).then(() => removeEventInCalendar(eventId))
+    console.log('🗑️ useCalendar.removeEvent chamado com:', eventId);
+    
+    store.removeEvent(eventId).then(() => {
+      console.log('✅ Evento removido, atualizando calendário');
+      removeEventInCalendar(eventId);
+    }).catch(error => {
+      console.error('❌ Erro ao remover evento:', error);
+    });
   }
 
   const calendarOptions = reactive({
@@ -327,25 +415,25 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     dayMaxEvents: 2,
     navLinks: true,
     locales: [ptBrLocale, enLocale],
-    locale: 'pt-br', // ✅ AJUSTE: Força o locale português brasileiro
+    locale: 'pt-br',
     
-    // ✅ AJUSTE: Configurações de formatação de data brasileira
-    dayHeaderFormat: { weekday: 'short' }, // Seg, Ter, Qua...
-    eventTimeFormat: { // Formato de hora dos eventos
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false // Formato 24h
-    },
-    slotLabelFormat: { // Formato das horas na lateral
+    // Configurações de formatação de data brasileira
+    dayHeaderFormat: { weekday: 'short' },
+    eventTimeFormat: {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     },
-    titleFormat: { // Formato do título do calendário
+    slotLabelFormat: {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    },
+    titleFormat: {
       year: 'numeric',
       month: 'long'
     },
-    dayPopoverFormat: { // Formato do popup de dia
+    dayPopoverFormat: {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -355,17 +443,15 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     moreLinkText: 'mais',
     noEventsText: 'Nenhum evento para exibir',
     
-    // ✅ AJUSTE: Configuração específica para exibição de datas
-    displayEventTime: true, // Mostra horário dos eventos
-    displayEventEnd: true, // Mostra horário de fim
+    displayEventTime: true,
+    displayEventEnd: true,
     
-    // ✅ AJUSTE: Formatação customizada para diferentes visualizações
     views: {
       dayGridMonth: {
-        dayHeaderFormat: { weekday: 'short' }, // Seg, Ter, Qua
-        titleFormat: { year: 'numeric', month: 'long' }, // Janeiro 2024
+        dayHeaderFormat: { weekday: 'short' },
+        titleFormat: { year: 'numeric', month: 'long' },
         dayCellContent: function(arg) {
-          return arg.dayNumberText; // Apenas o número do dia
+          return arg.dayNumberText;
         }
       },
       timeGridWeek: {
@@ -483,10 +569,20 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
 
     eventClick({ event: clickedEvent, jsEvent }) {
       jsEvent.preventDefault()
-      if (clickedEvent.url) (clickedEvent.url, '_blank')
+      if (clickedEvent.url) window.open(clickedEvent.url, '_blank')
+
+      // ✅ CORRIGIDO: Extrair dados completos do evento clicado
+      const eventData = extractEventDataFromEventApi(clickedEvent)
+      
+      console.log('🖱️ Evento clicado:', {
+        id: eventData.id,
+        title: eventData.title,
+        clienteId: eventData.extendedProps.clienteId,
+        assignedUser: eventData.extendedProps.assignedUser
+      });
 
       event.value = {
-        ...extractEventDataFromEventApi(clickedEvent),
+        ...eventData,
         description: clickedEvent.extendedProps?.description || clickedEvent.description || ''
       }
 
@@ -494,17 +590,30 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     },
 
     dateClick(info) {
-      event.value = { ...event.value, start: info.date }
+      console.log('📅 Data clicada:', info.date);
+      
+      // ✅ CORRIGIDO: Resetar evento para novo
+      event.value = { 
+        ...JSON.parse(JSON.stringify(blankEvent)), 
+        start: info.date,
+        end: new Date(info.date.getTime() + 60 * 60 * 1000) // 1 hora depois
+      }
+      
       isEventHandlerSidebarActive.value = true
     },
 
     eventDrop({ event: droppedEvent }) {
-      updateEvent(extractEventDataFromEventApi(droppedEvent))
+      console.log('📦 Evento movido:', droppedEvent);
+      const eventData = extractEventDataFromEventApi(droppedEvent)
+      updateEvent(eventData)
     },
 
     eventResize({ event: resizedEvent }) {
-      if (resizedEvent.start && resizedEvent.end)
-        updateEvent(extractEventDataFromEventApi(resizedEvent))
+      console.log('📏 Evento redimensionado:', resizedEvent);
+      if (resizedEvent.start && resizedEvent.end) {
+        const eventData = extractEventDataFromEventApi(resizedEvent)
+        updateEvent(eventData)
+      }
     },
 
     customButtons: {
@@ -517,9 +626,9 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     },
   })
 
-  // ✅ AJUSTE: Garante que o locale seja sempre pt-br
+  // Garantir que o locale seja sempre pt-br
   watch(locale, newLocale => {
-    const fcLocale = 'pt-br' // Sempre usar português brasileiro
+    const fcLocale = 'pt-br'
     
     if (calendarApi.value) {
       calendarApi.value.setOption('locale', fcLocale)
@@ -537,7 +646,7 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
   onMounted(() => {
     calendarApi.value = refCalendar.value.getApi()
     
-    // ✅ AJUSTE: Força configurações de localização após o mount
+    // Força configurações de localização após o mount
     if (calendarApi.value) {
       calendarApi.value.setOption('locale', 'pt-br')
     }

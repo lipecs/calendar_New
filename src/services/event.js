@@ -1,4 +1,4 @@
-// src/services/event.js (com formatação BR)
+// src/services/event.js - CORRIGIDO
 import axios from 'axios';
 import authService from './auth';
 
@@ -62,11 +62,13 @@ class EventService {
     }
   }
 
-  // 👉 Preparar evento para envio ao servidor
+  // ✅ CORRIGIDO: Preparar evento para envio ao servidor
   prepareEventForServer(eventData) {
     const preparedEvent = { ...eventData };
     
-    // Converter datas para ISO se estiverem em formato BR
+    console.log('🔄 Preparando evento para servidor:', preparedEvent);
+    
+    // ✅ CORRIGIDO: Converter datas para ISO se necessário
     if (preparedEvent.start) {
       if (typeof preparedEvent.start === 'string' && preparedEvent.start.includes('/')) {
         const isoDate = this.convertBRDateToISO(preparedEvent.start);
@@ -85,14 +87,40 @@ class EventService {
       }
     }
     
+    // ✅ CORRIGIDO: Garantir que campos específicos estão mapeados corretamente
+    if (preparedEvent.extendedProps?.clienteId && !preparedEvent.clientId) {
+      preparedEvent.clientId = parseInt(preparedEvent.extendedProps.clienteId);
+    }
+    
+    if (preparedEvent.extendedProps?.assignedUser && !preparedEvent.assignedUserId) {
+      preparedEvent.assignedUserId = parseInt(preparedEvent.extendedProps.assignedUser);
+    }
+    
+    // ✅ NOVO: Garantir que extendedProps existe
+    if (!preparedEvent.extendedProps) {
+      preparedEvent.extendedProps = {};
+    }
+    
+    console.log('✅ Evento preparado:', {
+      id: preparedEvent.id,
+      title: preparedEvent.title,
+      userId: preparedEvent.userId,
+      clientId: preparedEvent.clientId,
+      assignedUserId: preparedEvent.assignedUserId,
+      start: preparedEvent.start,
+      end: preparedEvent.end
+    });
+    
     return preparedEvent;
   }
 
-  // 👉 Processar evento recebido do servidor
+  // ✅ CORRIGIDO: Processar evento recebido do servidor
   processEventFromServer(event) {
     const processedEvent = { ...event };
     
-    // Converter datas ISO para objetos Date (FullCalendar espera Date objects)
+    console.log('🔄 Processando evento do servidor:', event);
+    
+    // ✅ CORRIGIDO: Converter datas ISO para objetos Date (FullCalendar espera Date objects)
     if (processedEvent.start) {
       processedEvent.start = new Date(processedEvent.start);
     }
@@ -100,6 +128,40 @@ class EventService {
     if (processedEvent.end) {
       processedEvent.end = new Date(processedEvent.end);
     }
+    
+    // ✅ CORRIGIDO: Garantir que extendedProps está completo
+    if (!processedEvent.extendedProps) {
+      processedEvent.extendedProps = {};
+    }
+    
+    // ✅ NOVO: Mapear campos do backend para o frontend
+    if (event.clientId && !processedEvent.extendedProps.clienteId) {
+      processedEvent.extendedProps.clienteId = event.clientId;
+    }
+    
+    if (event.assignedUserId && !processedEvent.extendedProps.assignedUser) {
+      processedEvent.extendedProps.assignedUser = event.assignedUserId;
+    }
+    
+    // ✅ NOVO: Garantir campos padrão
+    processedEvent.extendedProps = {
+      calendar: processedEvent.extendedProps.calendar || 'Meeting',
+      location: processedEvent.extendedProps.location || '',
+      status: processedEvent.extendedProps.status || 'In Progress',
+      guests: processedEvent.extendedProps.guests || [],
+      clienteId: processedEvent.extendedProps.clienteId || event.clientId || null,
+      cliente: processedEvent.extendedProps.cliente || '',
+      assignedUser: processedEvent.extendedProps.assignedUser || event.assignedUserId || null,
+      ...processedEvent.extendedProps
+    };
+    
+    console.log('✅ Evento processado:', {
+      id: processedEvent.id,
+      title: processedEvent.title,
+      userId: processedEvent.userId,
+      clienteId: processedEvent.extendedProps.clienteId,
+      assignedUser: processedEvent.extendedProps.assignedUser
+    });
     
     return processedEvent;
   }
@@ -128,12 +190,16 @@ class EventService {
         params.userId = userId;
       }
       
+      console.log('📡 Buscando eventos:', { url, params });
+      
       const response = await axios.get(url, { 
         params,
         headers: this.getAuthHeaders()
       });
       
-      // Processar eventos recebidos do servidor
+      console.log('📥 Resposta recebida:', response.data?.length, 'eventos');
+      
+      // ✅ CORRIGIDO: Processar eventos recebidos do servidor
       const processedEvents = response.data.map(event => this.processEventFromServer(event));
       return processedEvents;
     } catch (error) {
@@ -147,12 +213,16 @@ class EventService {
     try {
       authService.isAuthenticated();
       
+      console.log('👤 Buscando eventos do usuário:', userId);
+      
       const response = await axios.get(API_URL, {
         params: { userId },
         headers: this.getAuthHeaders()
       });
       
-      // Processar eventos recebidos do servidor
+      console.log('📥 Eventos do usuário recebidos:', response.data?.length);
+      
+      // ✅ CORRIGIDO: Processar eventos recebidos do servidor
       const processedEvents = response.data.map(event => this.processEventFromServer(event));
       return processedEvents;
     } catch (error) {
@@ -168,7 +238,7 @@ class EventService {
         headers: this.getAuthHeaders()
       });
       
-      // Processar evento recebido do servidor
+      // ✅ CORRIGIDO: Processar evento recebido do servidor
       return this.processEventFromServer(response.data);
     } catch (error) {
       console.error(`Erro ao buscar evento ${id}:`, error);
@@ -180,22 +250,26 @@ class EventService {
     try {
       authService.isAuthenticated();
       
-      // Preparar evento para o servidor
+      // ✅ CORRIGIDO: Preparar evento para o servidor
       const preparedEvent = this.prepareEventForServer(eventData);
       
-      // Adiciona o ID do usuário atual ao evento
+      // Adiciona o ID do usuário atual ao evento se não estiver definido
       const currentUser = authService.getCurrentUser();
       if (currentUser && currentUser.userData && currentUser.userData.id) {
-        preparedEvent.userId = currentUser.userData.id;
+        if (!preparedEvent.userId) {
+          preparedEvent.userId = currentUser.userData.id;
+        }
       }
       
-      console.log('📤 Enviando evento para o servidor:', preparedEvent);
+      console.log('📤 Enviando evento para criação:', preparedEvent);
       
       const response = await axios.post(API_URL, preparedEvent, {
         headers: this.getAuthHeaders()
       });
       
-      // Processar evento retornado do servidor
+      console.log('✅ Evento criado no backend:', response.data);
+      
+      // ✅ CORRIGIDO: Processar evento retornado do servidor
       return this.processEventFromServer(response.data);
     } catch (error) {
       console.error('Erro ao criar evento:', error);
@@ -207,16 +281,18 @@ class EventService {
     try {
       authService.isAuthenticated();
       
-      // Preparar evento para o servidor
+      // ✅ CORRIGIDO: Preparar evento para o servidor
       const preparedEvent = this.prepareEventForServer(eventData);
       
-      console.log('📤 Atualizando evento no servidor:', preparedEvent);
+      console.log('📤 Enviando evento para atualização:', preparedEvent);
       
       const response = await axios.put(`${API_URL}/${id}`, preparedEvent, {
         headers: this.getAuthHeaders()
       });
       
-      // Processar evento retornado do servidor
+      console.log('✅ Evento atualizado no backend:', response.data);
+      
+      // ✅ CORRIGIDO: Processar evento retornado do servidor
       return this.processEventFromServer(response.data);
     } catch (error) {
       console.error(`Erro ao atualizar evento ${id}:`, error);
@@ -227,9 +303,13 @@ class EventService {
   async deleteEvent(id) {
     try {
       authService.isAuthenticated();
+      console.log('🗑️ Deletando evento:', id);
+      
       const response = await axios.delete(`${API_URL}/${id}`, {
         headers: this.getAuthHeaders()
       });
+      
+      console.log('✅ Evento deletado');
       return response.data;
     } catch (error) {
       console.error(`Erro ao excluir evento ${id}:`, error);
@@ -257,7 +337,7 @@ class EventService {
   }
 
   // Método auxiliar para agrupar eventos por categoria
-  groupEventsByCategory(events) {
+  groupEventsByCategory(events) { 
     const categories = {};
     events.forEach(event => {
       const category = event.extendedProps?.calendar || 'Sem categoria';
@@ -276,7 +356,7 @@ class EventService {
         headers: this.getAuthHeaders()
       });
       
-      // Processar eventos recebidos do servidor
+      // ✅ CORRIGIDO: Processar eventos recebidos do servidor
       const processedEvents = response.data.map(event => this.processEventFromServer(event));
       return processedEvents;
     } catch (error) {
@@ -287,11 +367,13 @@ class EventService {
 
   // Método para exportar eventos para CSV
   exportEventsAsCSV(events, filename = 'eventos.csv') {
-    const headers = ['Título', 'Início', 'Fim', 'Status', 'Categoria', 'Descrição'];
+    const headers = ['Título', 'Cliente', 'Vendedor', 'Início', 'Fim', 'Status', 'Categoria', 'Descrição'];
     const csvContent = [
       headers.join(','),
       ...events.map(event => [
         `"${event.title}"`,
+        `"${event.extendedProps?.cliente || ''}"`,
+        `"${event.extendedProps?.assignedUser || event.userId || ''}"`,
         `"${this.formatDateToBR(event.start)}"`,
         `"${this.formatDateToBR(event.end)}"`,
         `"${event.extendedProps?.status || ''}"`,

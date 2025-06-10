@@ -239,7 +239,7 @@ const calculateAppointmentMetrics = (events) => {
     const eventDate = new Date(e.start)
     return eventDate >= weekStart && eventDate < nextWeekStart
   })
-
+  
   const nextWeekEvents = events.filter(e => {
     const eventDate = new Date(e.start)
     return eventDate >= nextWeekStart && eventDate < new Date(nextWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000)

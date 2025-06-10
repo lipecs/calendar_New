@@ -47,7 +47,7 @@ const alert = ref({
   message: ''
 })
 
-// Carregar usuários - hierarquia
+// ✅ CORRIGIDO: Carregar usuários - hierarquia aprimorada
 const loadUsers = async () => {
   if (!canCreateForOthers.value) return
 
@@ -60,12 +60,15 @@ const loadUsers = async () => {
     let filteredUsers = []
 
     if (currentUserLevel >= 4) {
+      // Diretor/Admin - todos os vendedores
       filteredUsers = users.filter(u => u.role === 'vendedor')
     } else if (currentUserLevel === 3) {
+      // Supervisor - vendedores sob sua responsabilidade
       filteredUsers = users.filter(u =>
         u.role === 'vendedor' && u.supervisorId === currentUser.userData.id
       )
     } else if (currentUserLevel === 2) {
+      // Coordenador - vendedores sob sua responsabilidade
       filteredUsers = users.filter(u =>
         u.role === 'vendedor' && u.coordenadorId === currentUser.userData.id
       )
@@ -76,20 +79,26 @@ const loadUsers = async () => {
       username: user.username,
       email: user.email,
       displayName: `${user.username} (${user.email})`,
-      avatar: avatar1
+      avatar: avatar1,
+      supervisorId: user.supervisorId,
+      coordenadorId: user.coordenadorId
     }))
+
+    console.log('👥 Usuários carregados:', availableUsers.value)
   } catch (error) {
+    console.error('Erro ao carregar usuários:', error)
     showAlert('error', 'Erro ao carregar usuários: ' + (error.response?.data || error.message))
   } finally {
     isLoadingUsers.value = false
   }
 }
 
-// Carregar clientes do backend
+// ✅ CORRIGIDO: Carregar clientes do backend
 const loadClients = async () => {
   try {
     isLoadingClients.value = true
     const clients = await clientService.getAvailableClients()
+    
     availableClients.value = clients.map(client => ({
       id: client.id,
       name: client.name,
@@ -99,13 +108,18 @@ const loadClients = async () => {
       vendedorId: client.vendedorId,
       coordenadorId: client.coordenadorId
     }))
+
+    console.log('🏢 Clientes carregados:', availableClients.value)
   } catch (error) {
-    showAlert('error', 'Erro ao carregar clientes: ' + (error.response?.data || error.message))
+    console.error('Erro ao carregar clientes:', error)
+    showAlert('warning', 'Erro ao carregar clientes, usando dados simulados')
+    
+    // Fallback para dados simulados
     availableClients.value = [
-      { id: 1, name: 'Empresa ABC Ltda', code: 'CLI001', displayName: 'Empresa ABC Ltda (CLI001)' },
-      { id: 2, name: 'XYZ Comercial', code: 'CLI002', displayName: 'XYZ Comercial (CLI002)' },
-      { id: 3, name: 'Tech Solutions', code: 'CLI003', displayName: 'Tech Solutions (CLI003)' },
-      { id: 4, name: 'Global Corp', code: 'CLI004', displayName: 'Global Corp (CLI004)' }
+      { id: 1, name: 'Empresa ABC Ltda', code: 'CLI001', displayName: 'Empresa ABC Ltda (CLI001)', vendedorId: null },
+      { id: 2, name: 'XYZ Comercial', code: 'CLI002', displayName: 'XYZ Comercial (CLI002)', vendedorId: null },
+      { id: 3, name: 'Tech Solutions', code: 'CLI003', displayName: 'Tech Solutions (CLI003)', vendedorId: null },
+      { id: 4, name: 'Global Corp', code: 'CLI004', displayName: 'Global Corp (CLI004)', vendedorId: null }
     ]
   } finally {
     isLoadingClients.value = false
@@ -140,7 +154,9 @@ watch(() => props.isDrawerOpen, async (newValue) => {
     promises.push(loadClients())
     try {
       await Promise.all(promises)
-    } catch {}
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+    }
   }
 })
 
@@ -148,6 +164,8 @@ watch(() => props.isDrawerOpen, async (newValue) => {
 watch(() => props.event, (newEvent) => {
   if (newEvent) {
     event.value = JSON.parse(JSON.stringify(newEvent))
+    
+    // ✅ CORRIGIDO: Carregar clientes se não estiverem carregados
     if (event.value.extendedProps?.clienteId && availableClients.value.length === 0) {
       loadClients()
     }
@@ -170,26 +188,61 @@ const removeEvent = () => {
   emit('update:isDrawerOpen', false)
 }
 
-// Handle submit - garante userId correto
+// ✅ CORRIGIDO: Handle submit - melhor controle de userId e clienteId
 const handleSubmit = () => {
   refForm.value?.validate().then(({ valid }) => {
     if (valid) {
-      // Determinar o userId correto para o evento
+      console.log('📝 Dados do evento antes do submit:', {
+        assignedUser: event.value.extendedProps?.assignedUser,
+        clienteId: event.value.extendedProps?.clienteId,
+        title: event.value.title
+      })
+
+      // ✅ CORRIGIDO: Determinar o userId correto
       let targetUserId = authService.getCurrentUser().userData.id
+      
+      // Se é criação para outro usuário (supervisor/coordenador/diretor/admin)
       if (canCreateForOthers.value && event.value.extendedProps?.assignedUser) {
-        targetUserId = event.value.extendedProps.assignedUser
+        targetUserId = parseInt(event.value.extendedProps.assignedUser)
+        console.log('👤 Atribuindo evento ao vendedor:', targetUserId)
       }
+      
+      // Garantir que o userId está definido
       event.value.userId = targetUserId
 
-      // Garantir que informações do cliente estão presentes
+      // ✅ CORRIGIDO: Garantir que as informações do cliente estão corretas
       if (event.value.extendedProps?.clienteId) {
-        const selectedClient = availableClients.value.find(c => c.id === event.value.extendedProps.clienteId)
+        const selectedClient = availableClients.value.find(c => c.id === parseInt(event.value.extendedProps.clienteId))
         if (selectedClient) {
           event.value.extendedProps.cliente = selectedClient.name
+          event.value.extendedProps.clienteCode = selectedClient.code
+          // ✅ NOVO: Mapear para o backend
+          event.value.clientId = parseInt(event.value.extendedProps.clienteId)
+          console.log('🏢 Cliente vinculado:', selectedClient.name, 'ID:', event.value.clientId)
         }
       }
 
-      if ('id' in event.value) {
+      // ✅ CORRIGIDO: Garantir que extendedProps existe
+      if (!event.value.extendedProps) {
+        event.value.extendedProps = {}
+      }
+
+      // ✅ CORRIGIDO: Garantir que assignedUserId seja salvo também
+      if (event.value.extendedProps.assignedUser) {
+        event.value.assignedUserId = parseInt(event.value.extendedProps.assignedUser)
+        console.log('📋 AssignedUserId definido:', event.value.assignedUserId)
+      }
+
+      console.log('🚀 Evento final para submissão:', {
+        id: event.value.id,
+        title: event.value.title,
+        userId: event.value.userId,
+        clientId: event.value.clientId,
+        assignedUserId: event.value.assignedUserId,
+        extendedProps: event.value.extendedProps
+      })
+
+      if ('id' in event.value && event.value.id) {
         emit('updateEvent', event.value)
       } else {
         emit('addEvent', event.value)
@@ -241,43 +294,79 @@ const statusOptions = computed(() => [
 
 const assignedUserDisplay = computed(() => {
   if (!event.value.extendedProps?.assignedUser) return null
-  const user = availableUsers.value.find(u => u.id === event.value.extendedProps.assignedUser)
+  const user = availableUsers.value.find(u => u.id === parseInt(event.value.extendedProps.assignedUser))
   return user ? user.displayName : null
 })
 
 const selectedClientDisplay = computed(() => {
   if (!event.value.extendedProps?.clienteId) return null
-  const client = availableClients.value.find(c => c.id === event.value.extendedProps.clienteId)
+  const client = availableClients.value.find(c => c.id === parseInt(event.value.extendedProps.clienteId))
   return client ? client.displayName : null
 })
 
-// Filtrar clientes por vendedor se necessário
+// ✅ CORRIGIDO: Filtrar clientes baseado no vendedor selecionado ou hierarquia
 const filteredClients = computed(() => {
-  if (!event.value.extendedProps?.assignedUser || authService.isVendedor()) {
+  const currentUser = authService.getCurrentUser()
+  const currentUserLevel = authService.getHierarchyLevel()
+  
+  // Se é vendedor, vê apenas seus clientes
+  if (authService.isVendedor()) {
+    return availableClients.value.filter(client => 
+      client.vendedorId === currentUser.userData.id || 
+      client.vendedorId === null // Clientes não atribuídos
+    )
+  }
+  
+  // Se selecionou um vendedor específico, filtrar por ele
+  if (event.value.extendedProps?.assignedUser) {
+    const selectedUserId = parseInt(event.value.extendedProps.assignedUser)
+    return availableClients.value.filter(client => 
+      client.vendedorId === selectedUserId || 
+      client.vendedorId === null // Clientes não atribuídos
+    )
+  }
+  
+  // Para coordenador, supervisor, diretor e admin - todos os clientes da hierarquia
+  if (currentUserLevel >= 2) {
     return availableClients.value
   }
-  const selectedUserId = event.value.extendedProps.assignedUser
-  return availableClients.value.filter(client => client.vendedorId === selectedUserId)
+  
+  return availableClients.value
 })
 
-// Limpa cliente se vendedor muda e cliente não pertence ao novo vendedor
+// ✅ CORRIGIDO: Limpa cliente se vendedor muda e cliente não pertence ao novo vendedor
 watch(() => event.value.extendedProps?.assignedUser, (newUserId, oldUserId) => {
   if (newUserId !== oldUserId && event.value.extendedProps?.clienteId) {
-    const currentClient = availableClients.value.find(c => c.id === event.value.extendedProps.clienteId)
-    if (currentClient && currentClient.vendedorId !== newUserId) {
+    const currentClient = availableClients.value.find(c => c.id === parseInt(event.value.extendedProps.clienteId))
+    if (currentClient && currentClient.vendedorId && currentClient.vendedorId !== parseInt(newUserId)) {
+      console.log('🔄 Limpando cliente porque vendedor mudou')
       event.value.extendedProps.clienteId = null
+      event.value.clientId = null
     }
   }
 })
 
-// Cliente obrigatório
-const isClientRequired = computed(() => true)
+// ✅ CORRIGIDO: Cliente obrigatório apenas se não for admin/diretor criando para vendedor
+const isClientRequired = computed(() => {
+  // Se está atribuindo para um vendedor, cliente é obrigatório
+  if (event.value.extendedProps?.assignedUser) {
+    return true
+  }
+  // Se é vendedor logado, cliente é obrigatório
+  if (authService.isVendedor()) {
+    return true
+  }
+  // Para outros níveis, opcional
+  return false
+})
 
 onMounted(async () => {
   try {
     if (canCreateForOthers.value) await loadUsers()
     await loadClients()
-  } catch {}
+  } catch (error) {
+    console.error('Erro no onMounted:', error)
+  }
 })
 </script>
 
@@ -304,10 +393,48 @@ onMounted(async () => {
         <VCardText>
           <VForm ref="refForm" @submit.prevent="handleSubmit">
             <VRow>
+              <!-- Título -->
               <VCol cols="12">
                 <VTextField v-model="event.title" :label="$t('Title')" :placeholder="$t('Meeting with Jane')"
                   :rules="[requiredValidator]" />
               </VCol>
+
+              <!-- Atribuir a Vendedor (para supervisores+) -->
+              <VCol v-if="canCreateForOthers" cols="12">
+                <VSelect v-model="event.extendedProps.assignedUser" :label="$t('Atribuir a Vendedor')"
+                  :placeholder="isLoadingUsers ? $t('Carregando vendedores...') : $t('Selecionar vendedor para este agendamento')"
+                  :items="availableUsers" :item-title="'displayName'" :item-value="'id'" :loading="isLoadingUsers"
+                  :disabled="isLoadingUsers" clearable>
+                  <template #selection="{ item }">
+                    <div class="align-center d-flex">
+                      <VAvatar size="24" class="me-2">
+                        <VImg :src="item.raw.avatar" />
+                      </VAvatar>
+                      <span>{{ item.raw.displayName }}</span>
+                    </div>
+                  </template>
+                  <template #item="{ item, props: itemProps }">
+                    <VListItem v-bind="itemProps">
+                      <template #prepend>
+                        <VAvatar size="32">
+                          <VImg :src="item.raw.avatar" />
+                        </VAvatar>
+                      </template>
+                      <VListItemTitle>{{ item.raw.username }}</VListItemTitle>
+                      <VListItemSubtitle>{{ item.raw.email }}</VListItemSubtitle>
+                    </VListItem>
+                  </template>
+                  <template #no-data>
+                    <VListItem>
+                      <VListItemTitle class="text-center text-medium-emphasis">
+                        {{ isLoadingUsers ? 'Carregando vendedores...' : 'Nenhum vendedor disponível' }}
+                      </VListItemTitle>
+                    </VListItem>
+                  </template>
+                </VSelect>
+              </VCol>
+
+              <!-- Cliente -->
               <VCol cols="12">
                 <VSelect v-model="event.extendedProps.clienteId" :label="$t('Cliente')"
                   :placeholder="isLoadingClients ? $t('Carregando clientes...') : $t('Selecionar cliente')"
@@ -343,6 +470,8 @@ onMounted(async () => {
                   </template>
                 </VSelect>
               </VCol>
+
+              <!-- Categoria/Label -->
               <VCol cols="12">
                 <VSelect v-model="event.extendedProps.calendar" :label="$t('Label')"
                   :placeholder="$t('Select Event Label')" :rules="[requiredValidator]" :items="store.availableCalendars"
@@ -363,68 +492,51 @@ onMounted(async () => {
                   </template>
                 </VSelect>
               </VCol>
-              <VCol v-if="canCreateForOthers" cols="12">
-                <VSelect v-model="event.extendedProps.assignedUser" :label="$t('Atribuir a Vendedor')"
-                  :placeholder="isLoadingUsers ? $t('Carregando vendedores...') : $t('Selecionar vendedor para este agendamento')"
-                  :items="availableUsers" :item-title="'displayName'" :item-value="'id'" :loading="isLoadingUsers"
-                  :disabled="isLoadingUsers" clearable>
-                  <template #selection="{ item }">
-                    <div class="align-center d-flex">
-                      <VAvatar size="24" class="me-2">
-                        <VImg :src="item.raw.avatar" />
-                      </VAvatar>
-                      <span>{{ item.raw.displayName }}</span>
-                    </div>
-                  </template>
-                  <template #item="{ item, props: itemProps }">
-                    <VListItem v-bind="itemProps">
-                      <template #prepend>
-                        <VAvatar size="32">
-                          <VImg :src="item.raw.avatar" />
-                        </VAvatar>
-                      </template>
-                      <VListItemTitle>{{ item.raw.username }}</VListItemTitle>
-                      <VListItemSubtitle>{{ item.raw.email }}</VListItemSubtitle>
-                    </VListItem>
-                  </template>
-                  <template #no-data>
-                    <VListItem>
-                      <VListItemTitle class="text-center text-medium-emphasis">
-                        {{ isLoadingUsers ? 'Carregando vendedores...' : 'Nenhum vendedor disponível' }}
-                      </VListItemTitle>
-                    </VListItem>
-                  </template>
-                </VSelect>
-              </VCol>
+
+              <!-- Data de Início -->
               <VCol cols="12">
                 <AppDateTimePicker :key="JSON.stringify(startDateTimePickerConfig)" v-model="event.start"
                   :label="$t('Start date')" :placeholder="$t('Select Date')" :rules="[requiredValidator]"
                   :config="startDateTimePickerConfig" />
               </VCol>
+
+              <!-- Data de Fim -->
               <VCol cols="12">
                 <AppDateTimePicker :key="JSON.stringify(endDateTimePickerConfig)" v-model="event.end"
                   :label="$t('End date')" :placeholder="$t('Select End Date')" :rules="[requiredValidator]"
                   :config="endDateTimePickerConfig" />
               </VCol>
+
+              <!-- Dia inteiro -->
               <VCol cols="12">
                 <VSwitch v-model="event.allDay" :label="$t('All day')" />
               </VCol>
+
+              <!-- URL do evento -->
               <VCol cols="12">
                 <VTextField v-model="event.url" :label="$t('Event URL')" :placeholder="$t('https://event.com/meeting')"
                   :rules="[urlValidator]" type="url" />
               </VCol>
+
+              <!-- Localização -->
               <VCol cols="12">
                 <VTextField v-model="event.extendedProps.location" :label="$t('Location')"
                   :placeholder="$t('Meeting room')" />
               </VCol>
+
+              <!-- Descrição -->
               <VCol cols="12">
                 <VTextarea v-model="event.description" :label="$t('Description')" rows="3"
                   :placeholder="$t('Add a description for the event')" />
               </VCol>
+
+              <!-- Status -->
               <VCol cols="12">
                 <VSelect v-model="event.extendedProps.status" :label="$t('Status')" :placeholder="$t('Select status')"
                   :items="statusOptions" :item-title="'title'" :item-value="'value'" />
               </VCol>
+
+              <!-- Botões -->
               <VCol cols="12">
                 <VBtn type="submit" class="me-3">
                   {{ $t('Submit') }}
