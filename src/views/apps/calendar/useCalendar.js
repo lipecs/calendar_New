@@ -221,7 +221,7 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
 
           return formattedEvent;
         });
-
+        
         const coloredEvents = applyEventColors(formattedEvents);
         console.log('🎨 Eventos com cores aplicadas:', coloredEvents.length);
 
