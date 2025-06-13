@@ -8,22 +8,22 @@ export default [
   // },
   
   // ✅ NOVO: Painel de Vendedores (diretor, supervisor, coordenador)
-  {
-    title: 'Vendedor',
-    icon: { icon: 'ri-briefcase-4-line' },
-    to: 'pages-icons',
-    action: 'manage',
-    subject: 'Vendedores',
-  },
+  // {
+  //   title: 'Vendedor',
+  //   icon: { icon: 'ri-briefcase-4-line' },
+  //   to: 'pages-icons',
+  //   action: 'manage',
+  //   subject: 'Vendedores',
+  // },
   
   // ✅ NOVO: Gerenciamento de Clientes (diretor, supervisor)
-  {
-    title: 'Cliente',
-    icon: { icon: 'ri-file-user-line' },
-    to: 'pages-pricing',
-    action: 'manage',
-    subject: 'Clientes',
-  },
+  // {
+  //   title: 'Cliente',
+  //   icon: { icon: 'ri-file-user-line' },
+  //   to: 'pages-pricing',
+  //   action: 'manage',
+  //   subject: 'Clientes',
+  // },
   // {
   //   title: 'Components',
   //   icon: { icon: 'ri-toggle-line' },

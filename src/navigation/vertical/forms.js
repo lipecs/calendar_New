@@ -1,5 +1,5 @@
 export default [
-  // { heading: 'Forms & Tables' },
+  { heading: 'Forms' },
   // {
   //   title: 'Form Elements',
   //   icon: { icon: 'ri-radio-button-line' },
@@ -26,15 +26,12 @@ export default [
   //   icon: { icon: 'ri-layout-4-line' },
   //   to: 'forms-form-layouts',
   // },
-  // {
-  //   title: 'Form Wizard',
-  //   icon: { icon: 'ri-git-commit-line' },
-  //   children: [
-  //     { title: 'Numbered', to: 'forms-form-wizard-numbered' },
-  //     { title: 'Icons', to: 'forms-form-wizard-icons' },
-  //   ],
+  {
+    title: 'Forms',
+    icon: { icon: 'ri-survey-line' },
+    to: 'forms-form-wizard-numbered',
     
-  // },
+  },
   // {
   //   title: 'Form Validation',
   //   icon: { icon: 'ri-checkbox-multiple-line' },

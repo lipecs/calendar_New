@@ -22,7 +22,7 @@ export const themes = {
       'error': '#F44336', // Changed to material red
       'error-darken-1': '#D32F2F', // Darker red
       'on-error': '#fff',
-      'background': '#f1faf9', // gelo mais claro/suave para fundo do site
+      'background': '#f5f5f7', // gelo mais claro/suave para fundo do site
       'on-background': '#212121', // Texto escuro para contraste com fundo claro
       'surface': '#ffffff', // Branco para layouts
       'on-surface': '#212121',

@@ -22,13 +22,19 @@ export default [
   },
 
   // ✅ OPCIONAL: Seção de usuário para visualização de perfis
-  { heading: 'Usuários' },
+  { heading: 'Perfis' },
   {
     title: 'Perfil',
     icon: { icon: 'ri-user-line' },
     children: [
-      { title: 'Visualizar', to: { name: 'apps-user-view-id', params: { id: 21 } } },
+      { title: 'Meu Perfil', to: { name: 'apps-user-view-id', params: { id: 21 } } },
       // { title: 'Lista', to: 'apps-user-list' },
+
+
+       { title: 'Vendedor', to: { name: 'pages-icons', params: { id: 21 } } },
+
+              { title: 'Cliente', to: { name: 'pages-pricing', params: { id: 21 } } },
+
     ],
     
   },
