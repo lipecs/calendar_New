@@ -1,8 +1,8 @@
-<!-- src/views/apps/user/admin/UserManagement.vue - CORRIGIDO -->
+<!-- src/views/apps/user/admin/UserManagement.vue - COMPLETO CORRIGIDO -->
 <script setup>
 import authService from '@/services/auth';
 import userService from '@/services/user';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -37,7 +37,11 @@ const formErrors = ref({});
 
 // ✅ CORRIGIDO: Opções de papéis baseadas na hierarquia do usuário atual
 const roles = computed(() => {
-  const currentUserLevel = authService.getHierarchyLevel();
+  const currentUser = authService.getCurrentUser();
+  const currentUserRole = currentUser?.userData?.role;
+
+  console.log('🔍 Determinando papéis disponíveis para:', currentUserRole);
+
   const allRoles = [
     { title: 'Admin', value: 'admin', level: 5 },
     { title: 'Diretor', value: 'diretor', level: 4 },
@@ -46,14 +50,33 @@ const roles = computed(() => {
     { title: 'Vendedor', value: 'vendedor', level: 1 }
   ];
 
-  return allRoles.filter(role => role.level <= currentUserLevel);
+  // ✅ CORREÇÃO: Admin e Diretor podem criar qualquer papel
+  if (currentUserRole === 'admin') {
+    console.log('👑 Admin pode criar todos os papéis');
+    return allRoles;
+  }
+
+  if (currentUserRole === 'diretor') {
+    console.log('🎯 Diretor pode criar todos os papéis');
+    return allRoles;
+  }
+
+  // Para outros papéis, aplicar filtro por nível
+  const currentUserLevel = authService.getHierarchyLevel();
+  const availableRoles = allRoles.filter(role => role.level <= currentUserLevel);
+
+  console.log(`📋 ${currentUserRole} (nível ${currentUserLevel}) pode criar:`, availableRoles.map(r => r.value));
+  return availableRoles;
 });
 
-// ✅ CORRIGIDO: Lista de supervisores
+// ✅ CORRIGIDO: Lista de supervisores incluindo diretores e admins
 const supervisors = computed(() => {
-  return users.value.filter(user =>
+  const availableSupervisors = users.value.filter(user =>
     user.role === 'supervisor' || user.role === 'diretor' || user.role === 'admin'
   );
+
+  console.log('👥 Supervisores disponíveis:', availableSupervisors.map(s => `${s.username} (${s.role})`));
+  return availableSupervisors;
 });
 
 // ✅ CORRIGIDO: Lista de coordenadores
@@ -71,15 +94,34 @@ const headers = computed(() => [
   { title: t('Ações'), key: 'actions', sortable: false }
 ]);
 
-// ✅ CORRIGIDO: Carrega usuários
+// ✅ CORRIGIDO: Carrega usuários com melhor tratamento de erro
 const fetchUsers = async () => {
   try {
+    console.log('🔄 Carregando usuários...');
     isLoading.value = true;
+
+    // ✅ VERIFICAÇÃO: Confirmar se usuário está autenticado
+    if (!authService.isAuthenticated()) {
+      throw new Error('Usuário não autenticado');
+    }
+
     const data = await userService.getAllUsers();
-    users.value = data;
+    console.log('✅ Usuários carregados:', data?.length || 0);
+    users.value = data || [];
   } catch (error) {
-    console.error('Erro ao buscar usuários:', error);
-    showAlert('error', t('Erro ao carregar usuários') + ': ' + (error.response?.data?.message || error.message));
+    console.error('❌ Erro ao buscar usuários:', error);
+
+    // ✅ MELHOR TRATAMENTO DE ERRO
+    let errorMessage = 'Erro desconhecido';
+    if (error.response?.data) {
+      errorMessage = typeof error.response.data === 'string'
+        ? error.response.data
+        : error.response.data.message || 'Erro no servidor';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    showAlert('error', t('Erro ao carregar usuários') + ': ' + errorMessage);
   } finally {
     isLoading.value = false;
   }
@@ -87,6 +129,7 @@ const fetchUsers = async () => {
 
 // Abrir o drawer para adicionar novo usuário
 const openAddUserDrawer = () => {
+  console.log('➕ Abrindo drawer para adicionar usuário');
   isEditMode.value = false;
   resetForm();
   isUserDrawerOpen.value = true;
@@ -94,6 +137,7 @@ const openAddUserDrawer = () => {
 
 // Abrir o drawer para editar usuário existente
 const openEditUserDrawer = (user) => {
+  console.log('✏️ Abrindo drawer para editar usuário:', user.username);
   isEditMode.value = true;
   currentUserId.value = user.id;
 
@@ -112,6 +156,7 @@ const openEditUserDrawer = (user) => {
 
 // Resetar formulário
 const resetForm = () => {
+  console.log('🔄 Resetando formulário');
   userForm.value = {
     username: '',
     email: '',
@@ -124,8 +169,9 @@ const resetForm = () => {
   formErrors.value = {};
 };
 
-// ✅ CORRIGIDO: Validação com novos campos
+// ✅ CORRIGIDO: Validação hierárquica atualizada
 const validateForm = () => {
+  console.log('🔍 Validando formulário:', userForm.value);
   const errors = {};
 
   if (!userForm.value.username.trim()) {
@@ -152,8 +198,12 @@ const validateForm = () => {
     errors.confirmPassword = t('As senhas não coincidem');
   }
 
-  // ✅ NOVO: Validações hierárquicas
-  if (userForm.value.role === 'vendedor') {
+  // ✅ CORRIGIDO: Validações hierárquicas mais flexíveis
+  const role = userForm.value.role;
+
+  if (role === 'vendedor') {
+    console.log('🔍 Validando vendedor - Coordenador:', userForm.value.coordenadorId, 'Supervisor:', userForm.value.supervisorId);
+
     if (!userForm.value.coordenadorId) {
       errors.coordenadorId = t('Vendedor deve ter um coordenador');
     }
@@ -162,22 +212,75 @@ const validateForm = () => {
     }
   }
 
-  if (userForm.value.role === 'coordenador') {
+  if (role === 'coordenador') {
+    console.log('🔍 Validando coordenador - Supervisor:', userForm.value.supervisorId);
+
     if (!userForm.value.supervisorId) {
       errors.supervisorId = t('Coordenador deve ter um supervisor');
     }
+    // Coordenador não deve ter coordenador
+    if (userForm.value.coordenadorId) {
+      errors.coordenadorId = t('Coordenador não deve ter coordenador atribuído');
+    }
   }
 
+  // ✅ NOVO: Validação para supervisor
+  if (role === 'supervisor') {
+    console.log('🔍 Validando supervisor - Supervisor:', userForm.value.supervisorId);
+
+    // Supervisor pode ter supervisor (opcional)
+    // Supervisor não deve ter coordenador
+    if (userForm.value.coordenadorId) {
+      errors.coordenadorId = t('Supervisor não deve ter coordenador atribuído');
+    }
+  }
+
+  // ✅ NOVO: Validação para diretor
+  if (role === 'diretor') {
+    console.log('🔍 Validando diretor - Supervisor:', userForm.value.supervisorId);
+
+    // Diretor pode ter supervisor (admin ou outro diretor) - opcional
+    // Diretor não deve ter coordenador
+    if (userForm.value.coordenadorId) {
+      errors.coordenadorId = t('Diretor não deve ter coordenador atribuído');
+    }
+  }
+
+  // ✅ NOVO: Validação para admin
+  if (role === 'admin') {
+    console.log('🔍 Validando admin');
+
+    // Admin não deve ter supervisor nem coordenador
+    if (userForm.value.supervisorId) {
+      errors.supervisorId = t('Admin não deve ter supervisor atribuído');
+    }
+    if (userForm.value.coordenadorId) {
+      errors.coordenadorId = t('Admin não deve ter coordenador atribuído');
+    }
+  }
+
+  console.log('📋 Erros de validação:', errors);
   formErrors.value = errors;
   return Object.keys(errors).length === 0;
 };
 
-// ✅ CORRIGIDO: Salvar usuário
+// ✅ CORRIGIDO: Salvar usuário com logs detalhados
 const saveUser = async () => {
-  if (!validateForm()) return;
+  console.log('💾 Tentando salvar usuário...');
+
+  if (!validateForm()) {
+    console.log('❌ Validação falhou, parando execução');
+    return;
+  }
 
   try {
     isLoading.value = true;
+    console.log('🔄 Iniciando salvamento...');
+
+    // ✅ VERIFICAÇÃO: Confirmar autenticação
+    if (!authService.isAuthenticated()) {
+      throw new Error('Usuário não autenticado');
+    }
 
     const userData = {
       username: userForm.value.username,
@@ -187,24 +290,59 @@ const saveUser = async () => {
       coordenadorId: userForm.value.coordenadorId
     };
 
-    if (userForm.value.password) {
+    // ✅ CORREÇÃO: Sempre incluir password para criação, opcional para edição
+    if (!isEditMode.value) {
+      // Criação: senha é obrigatória
+      userData.password = userForm.value.password;
+    } else if (userForm.value.password && userForm.value.password.trim()) {
+      // Edição: senha só se fornecida
       userData.password = userForm.value.password;
     }
 
+    console.log('📤 Dados que serão enviados:', {
+      ...userData,
+      password: userData.password ? '[OCULTA]' : 'NÃO FORNECIDA'
+    });
+
     if (isEditMode.value) {
+      console.log('✏️ Atualizando usuário ID:', currentUserId.value);
       await userService.updateUser(currentUserId.value, userData);
       showAlert('success', t('Usuário atualizado com sucesso!'));
     } else {
-      await userService.createUser(userData);
+      console.log('➕ Criando novo usuário');
+      const result = await userService.createUser(userData);
+      console.log('✅ Usuário criado com sucesso:', result);
       showAlert('success', t('Usuário criado com sucesso!'));
     }
 
     isUserDrawerOpen.value = false;
     resetForm();
     fetchUsers();
+
   } catch (error) {
-    console.error('Erro ao salvar usuário:', error);
-    const errorMessage = error.response?.data || error.message;
+    console.error('❌ Erro ao salvar usuário:', {
+      error,
+      response: error.response,
+      data: error.response?.data,
+      status: error.response?.status
+    });
+
+    // ✅ MELHOR TRATAMENTO DE ERRO
+    let errorMessage = 'Erro desconhecido';
+
+    if (error.response?.data) {
+      if (typeof error.response.data === 'string') {
+        errorMessage = error.response.data;
+      } else if (error.response.data.message) {
+        errorMessage = error.response.data.message;
+      } else {
+        errorMessage = 'Erro no servidor';
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    console.error('📢 Mostrando erro para usuário:', errorMessage);
     showAlert('error', t('Erro ao salvar usuário') + ': ' + errorMessage);
   } finally {
     isLoading.value = false;
@@ -216,13 +354,23 @@ const deleteUser = async (userId) => {
   if (!confirm(t('Tem certeza que deseja excluir este usuário?'))) return;
 
   try {
+    console.log('🗑️ Excluindo usuário ID:', userId);
     isLoading.value = true;
     await userService.deleteUser(userId);
     showAlert('success', t('Usuário excluído com sucesso!'));
     fetchUsers();
   } catch (error) {
-    console.error('Erro ao excluir usuário:', error);
-    const errorMessage = error.response?.data || error.message;
+    console.error('❌ Erro ao excluir usuário:', error);
+
+    let errorMessage = 'Erro desconhecido';
+    if (error.response?.data) {
+      errorMessage = typeof error.response.data === 'string'
+        ? error.response.data
+        : error.response.data.message || 'Erro no servidor';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
     showAlert('error', t('Erro ao excluir usuário') + ': ' + errorMessage);
   } finally {
     isLoading.value = false;
@@ -256,8 +404,43 @@ const getRoleColor = (role) => {
   return colors[role] || 'secondary';
 };
 
-// Mostrar alerta
+// ✅ NOVO: Obter label do supervisor baseado no papel
+const getSupervisorLabel = (role) => {
+  const labels = {
+    'vendedor': t('Supervisor Responsável'),
+    'coordenador': t('Supervisor Responsável'),
+    'supervisor': t('Supervisor Superior (Opcional)'),
+    'diretor': t('Responsável Superior (Opcional)')
+  };
+  return labels[role] || t('Supervisor');
+};
+
+// ✅ NOVO: Obter hint do supervisor baseado no papel
+const getSupervisorHint = (role) => {
+  const hints = {
+    'vendedor': 'Vendedor deve ter um supervisor',
+    'coordenador': 'Coordenador deve ter um supervisor',
+    'supervisor': 'Supervisor pode ter outro supervisor, diretor ou admin como responsável',
+    'diretor': 'Diretor pode ter admin ou outro diretor como responsável (opcional)'
+  };
+  return hints[role] || '';
+};
+
+// ✅ NOVO: Obter descrição do papel
+const getRoleDescription = (role) => {
+  const descriptions = {
+    'admin': 'Administrador tem acesso total ao sistema e pode gerenciar todos os usuários.',
+    'diretor': 'Diretor pode criar e gerenciar usuários de todos os níveis.',
+    'supervisor': 'Supervisor pode gerenciar coordenadores e vendedores sob sua responsabilidade.',
+    'coordenador': 'Coordenador gerencia vendedores atribuídos a ele.',
+    'vendedor': 'Vendedor tem acesso básico ao sistema e gerencia seus próprios clientes.'
+  };
+  return descriptions[role] || '';
+};
+
+// ✅ CORRIGIDO: Mostrar alerta com log
 const showAlert = (type, message) => {
+  console.log(`📢 Alerta ${type}:`, message);
   alert.value = {
     show: true,
     type,
@@ -269,18 +452,30 @@ const showAlert = (type, message) => {
   }, 5000);
 };
 
-// Watch para limpar coordenador quando role muda
-watch(() => userForm.value.role, (newRole) => {
-  if (['supervisor', 'diretor', 'admin'].includes(newRole)) {
+// ✅ CORRIGIDO: Watch para limpar campos quando role muda
+watch(() => userForm.value.role, (newRole, oldRole) => {
+  console.log('🔄 Role mudou de', oldRole, 'para', newRole);
+
+  // Limpar campos baseado no novo papel
+  if (['admin'].includes(newRole)) {
+    console.log('🧹 Limpando supervisor e coordenador para admin');
     userForm.value.supervisorId = null;
     userForm.value.coordenadorId = null;
-  } else if (newRole === 'coordenador') {
+  } else if (['diretor', 'supervisor'].includes(newRole)) {
+    console.log('🧹 Limpando coordenador para papel superior');
     userForm.value.coordenadorId = null;
+    // Supervisor pode permanecer para diretor e supervisor
+  } else if (newRole === 'coordenador') {
+    console.log('🧹 Limpando coordenador para papel de coordenador');
+    userForm.value.coordenadorId = null;
+    // Supervisor deve permanecer obrigatório
   }
+  // Para vendedor, ambos permanecem obrigatórios
 });
 
-// Carregar usuários ao montar o componente
+// ✅ CORRIGIDO: Carregar usuários ao montar o componente
 onMounted(() => {
+  console.log('🚀 Componente montado, carregando usuários...');
   fetchUsers();
 });
 </script>
@@ -333,6 +528,14 @@ onMounted(() => {
             </IconBtn>
           </div>
         </template>
+
+        <!-- ✅ NOVO: Template para quando não há usuários -->
+        <template #no-data>
+          <div class="text-center py-4">
+            <VIcon icon="ri-user-line" size="48" class="mb-2 text-disabled" />
+            <p class="text-disabled">{{ $t('Nenhum usuário encontrado') }}</p>
+          </div>
+        </template>
       </VDataTable>
     </VCardText>
 
@@ -364,16 +567,27 @@ onMounted(() => {
             <VSelect v-model="userForm.role" :items="roles" :label="$t('Função')" item-title="title" item-value="value"
               class="mb-3" :error-messages="formErrors.role" required />
 
-            <!-- ✅ CORRIGIDO: Supervisor (condicionalmente visível) -->
-            <VSelect v-if="['coordenador', 'vendedor'].includes(userForm.role)" v-model="userForm.supervisorId"
-              :items="supervisors" :label="$t('Supervisor Responsável')" item-title="username" item-value="id"
-              class="mb-3" :error-messages="formErrors.supervisorId" clearable
-              :required="['coordenador', 'vendedor'].includes(userForm.role)" />
+            <!-- ✅ CORRIGIDO: Supervisor (visível para coordenador, vendedor, supervisor e diretor) -->
+            <VSelect v-if="['diretor', 'supervisor', 'coordenador', 'vendedor'].includes(userForm.role)"
+              v-model="userForm.supervisorId" :items="supervisors" :label="getSupervisorLabel(userForm.role)"
+              item-title="username" item-value="id" class="mb-3" :error-messages="formErrors.supervisorId" clearable
+              :required="['coordenador', 'vendedor'].includes(userForm.role)" :hint="getSupervisorHint(userForm.role)"
+              persistent-hint />
 
             <!-- ✅ CORRIGIDO: Coordenador (apenas para vendedores) -->
             <VSelect v-if="userForm.role === 'vendedor'" v-model="userForm.coordenadorId" :items="coordenadores"
               :label="$t('Coordenador Responsável')" item-title="username" item-value="id" class="mb-3"
-              :error-messages="formErrors.coordenadorId" clearable required />
+              :error-messages="formErrors.coordenadorId" clearable required
+              hint="Vendedor deve ter um coordenador responsável" persistent-hint />
+
+            <!-- ✅ NOVO: Aviso para papéis superiores -->
+            <VAlert v-if="['admin', 'diretor', 'supervisor'].includes(userForm.role)" type="info" variant="tonal"
+              class="mb-3">
+              <template #prepend>
+                <VIcon icon="ri-information-line" />
+              </template>
+              {{ getRoleDescription(userForm.role) }}
+            </VAlert>
 
             <!-- Senha -->
             <VTextField v-model="userForm.password" :label="isEditMode ? $t('Nova senha (opcional)') : $t('Senha')"
@@ -400,3 +614,9 @@ onMounted(() => {
     </VNavigationDrawer>
   </VCard>
 </template>
+
+<style scoped>
+.scrollable-content {
+  overflow-y: auto;
+}
+</style>

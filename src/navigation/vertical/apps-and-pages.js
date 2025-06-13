@@ -1,34 +1,41 @@
+
 // src/navigation/vertical/apps-and-pages.js
 export default [
-  { heading: 'Calendar' },
+  { heading: 'Apps' },
   {
     title: 'Calendar',
     icon: { icon: 'ri-calendar-line' },
     to: 'apps-calendar',
   },
   
-  // Seção de usuário (mantido do antigo)
-  // {
-  //   title: 'User',
-  //   icon: { icon: 'ri-user-line' },
-  //   children: [
-  //     { title: 'View', to: { name: 'apps-user-view-id', params: { id: 21 } } },
-  //     { title: 'List', to: 'apps-user-list' },
-  //   ],
-  // },
+  // ✅ NOVO: Menu de administração
+  { heading: 'Administração',
+    action: 'manage',
+    subject: 'Users',
+   },
+    {
+    title: 'Users Management',
+    icon: { icon: 'ri-user-settings-line' },
+    to: 'admin-users',
+    action: 'manage',
+    subject: 'Users',
+  },
 
-  // Menu de gerenciamento de usuários - visível apenas para admins
-  // {
-  //   title: 'Users Management',
-  //   icon: { icon: 'ri-user-settings-line' },
-  //   to: 'admin-users',
-  //   action: 'manage',
-  //   subject: 'Users',
-  // },
+  // ✅ OPCIONAL: Seção de usuário para visualização de perfis
+  { heading: 'Usuários' },
+  {
+    title: 'Perfil',
+    icon: { icon: 'ri-user-line' },
+    children: [
+      { title: 'Visualizar', to: { name: 'apps-user-view-id', params: { id: 21 } } },
+      // { title: 'Lista', to: 'apps-user-list' },
+    ],
+    
+  },
 
-  // Seção de autenticação (mantido do antigo, mas comentado por padrão)
-  // Descomente se necessário para desenvolvimento/testes
+  // ✅ OPCIONAL: Seção de desenvolvimento (comentado por padrão)
   /*
+  { heading: 'Desenvolvimento' },
   {
     title: 'Authentication',
     icon: { icon: 'ri-shield-keyhole-line' },

@@ -1,11 +1,11 @@
 export default [
-  {
-    title: 'Users Management',
-    icon: { icon: 'ri-user-settings-line' },
-    to: 'admin-users',
-    action: 'manage',
-    subject: 'Users',
-  },
+  // {
+  //   title: 'Users Management',
+  //   icon: { icon: 'ri-user-settings-line' },
+  //   to: 'admin-users',
+  //   action: 'manage',
+  //   subject: 'Users',
+  // },
   
   // ✅ NOVO: Painel de Vendedores (diretor, supervisor, coordenador)
   {
