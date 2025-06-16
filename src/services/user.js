@@ -60,7 +60,6 @@ class UserService {
     }
   }
 
-  // ✅ CORRIGIDO: Buscar usuário por ID
   async getUserById(id) {
     try {
       if (!authService.isAuthenticated()) {
@@ -88,7 +87,6 @@ class UserService {
     }
   }
 
-  // ✅ CORRIGIDO: Criar usuário
   async createUser(userData) {
     try {
       console.log('➕ Criando usuário:', userData);
@@ -151,7 +149,6 @@ class UserService {
         }
       });
       
-      // Tratamento melhorado de erros
       if (error.response?.status === 400) {
         const errorMessage = error.response.data || 'Dados inválidos';
         throw new Error(typeof errorMessage === 'string' ? errorMessage : 'Erro de validação');
@@ -167,7 +164,6 @@ class UserService {
     }
   }
 
-  // ✅ CORRIGIDO: Atualizar usuário
   async updateUser(id, userData) {
     try {
       console.log('✏️ Atualizando usuário ID:', id, userData);
@@ -226,7 +222,6 @@ class UserService {
     }
   }
 
-  // ✅ CORRIGIDO: Deletar usuário
   async deleteUser(id) {
     try {
       if (!authService.isAuthenticated()) {

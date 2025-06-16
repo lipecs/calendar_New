@@ -1,4 +1,5 @@
 <!-- src/pages/pages/pricing.vue - CORRIGIDO para Backend Real -->
+
 <template>
   <VCard>
     <VCardTitle class="d-flex justify-space-between align-center flex-wrap">
@@ -392,7 +393,6 @@ const statusOptions = [
   { title: t('Bloqueado'), value: 'Bloqueado' }
 ];
 
-// ✅ NOVO: Filtrar vendedores baseado no coordenador selecionado
 const filteredVendedores = computed(() => {
   if (!clientData.value.coordenadorId) {
     return availableVendedores.value;
@@ -403,7 +403,6 @@ const filteredVendedores = computed(() => {
   );
 });
 
-// ✅ NOVO: Carregar coordenadores e vendedores do backend
 const loadUsers = async () => {
   try {
     const users = await userService.getAllUsers();
@@ -416,7 +415,6 @@ const loadUsers = async () => {
   }
 };
 
-// ✅ NOVO: Carregar clientes do backend
 const loadClients = async () => {
   try {
     isLoading.value = true;

@@ -348,7 +348,6 @@ const exportToCSV = () => {
   document.body.removeChild(link);
 };
 
-// Mostrar alerta
 const showAlert = (type, message) => {
   alert.value = { show: true, type, message };
   setTimeout(() => { alert.value.show = false; }, 5000);

@@ -1,5 +1,4 @@
-
-// src/navigation/vertical/apps-and-pages.js
+// src/navigation/vertical/apps-and-pages.js - ATUALIZADO com restrições de acesso
 export default [
   { heading: 'Apps' },
   {
@@ -8,12 +7,13 @@ export default [
     to: 'apps-calendar',
   },
   
-  // ✅ NOVO: Menu de administração
-  { heading: 'Administração',
+
+  { 
+    heading: 'Administração',
     action: 'manage',
     subject: 'Users',
-   },
-    {
+  },
+  {
     title: 'Users Management',
     icon: { icon: 'ri-user-settings-line' },
     to: 'admin-users',
@@ -21,25 +21,41 @@ export default [
     subject: 'Users',
   },
 
-  // ✅ OPCIONAL: Seção de usuário para visualização de perfis
-  { heading: 'Perfis' },
+
+  { 
+    heading: 'Perfis',
+    // Mostrar seção apenas para admins ou quando houver itens visíveis
+  },
   {
     title: 'Perfil',
     icon: { icon: 'ri-user-line' },
     children: [
-      { title: 'Meu Perfil', to: { name: 'apps-user-view-id', params: { id: 21 } } },
-      // { title: 'Lista', to: 'apps-user-list' },
+      { 
+        title: 'Meu Perfil', 
+        to: { name: 'apps-user-view-id', params: { id: 21 } },
+        // Sem restrição - todos podem ver o próprio perfil
+      },
+      
+      { 
+        title: 'Vendedor', 
+        to: { name: 'pages-icons', params: { id: 21 } },
+        action: 'manage',
+        subject: 'Vendedores',
+        // Será filtrado pelo sistema de permissões
+        adminOnly: true
+      },
 
-
-       { title: 'Vendedor', to: { name: 'pages-icons', params: { id: 21 } } },
-
-              { title: 'Cliente', to: { name: 'pages-pricing', params: { id: 21 } } },
-
+      { 
+        title: 'Cliente', 
+        to: { name: 'pages-pricing', params: { id: 21 } },
+        action: 'manage', 
+        subject: 'Clientes',
+        // Será filtrado pelo sistema de permissões
+        adminOnly: true
+      },
     ],
-    
   },
 
-  // ✅ OPCIONAL: Seção de desenvolvimento (comentado por padrão)
   /*
   { heading: 'Desenvolvimento' },
   {

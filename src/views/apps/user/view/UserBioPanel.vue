@@ -209,7 +209,6 @@ const saveProfile = async () => {
       currentPassword: profileForm.value.currentPassword
     })
 
-    // Atualizar dados locais do usuário
     const user = authService.getCurrentUser()
     if (user && user.userData) {
       user.userData.username = profileForm.value.username
@@ -284,7 +283,6 @@ watch(() => currentUser.value, () => {
 <template>
   <VRow>
     <VCol cols="12">
-      <!-- Alerta de mensagem -->
       <VAlert v-if="alert.show" :type="alert.type" closable class="mb-4" @click:close="alert.show = false">
         {{ alert.message }}
       </VAlert>
@@ -416,7 +414,6 @@ watch(() => currentUser.value, () => {
         </VCardText>
       </VCard>
 
-      <!-- Estado de erro -->
       <VCard v-else class="text-center pa-8">
         <VIcon icon="ri-error-warning-line" size="64" color="error" class="mb-4" />
         <h5 class="text-h5 mb-2">{{ $t('Erro ao carregar perfil') }}</h5>
@@ -428,7 +425,6 @@ watch(() => currentUser.value, () => {
     </VCol>
   </VRow>
 
-  <!-- Dialog de edição de perfil -->
   <VDialog v-model="isEditProfileDialogVisible" max-width="500px" persistent>
     <VCard>
       <VCardTitle class="text-h5 pa-6">
@@ -443,7 +439,7 @@ watch(() => currentUser.value, () => {
           <VTextField v-model="profileForm.username" :label="$t('Nome de usuário')"
             :error-messages="formErrors.username" class="mb-4" autofocus required />
 
-          <!-- Email -->
+          
           <VTextField v-model="profileForm.email" :label="$t('Email')" type="email" :error-messages="formErrors.email"
             class="mb-4" required />
 
@@ -451,15 +447,15 @@ watch(() => currentUser.value, () => {
 
           <p class="text-subtitle-2 mb-4">{{ $t('Alterar Senha (opcional)') }}</p>
 
-          <!-- Senha atual -->
+          
           <VTextField v-model="profileForm.currentPassword" :label="$t('Senha atual')" type="password"
             :error-messages="formErrors.currentPassword" class="mb-4" placeholder="Digite sua senha atual" />
 
-          <!-- Nova senha -->
+          
           <VTextField v-model="profileForm.newPassword" :label="$t('Nova senha')" type="password"
             :error-messages="formErrors.newPassword" class="mb-4" placeholder="Digite a nova senha" />
 
-          <!-- Confirmar nova senha -->
+          
           <VTextField v-model="profileForm.confirmPassword" :label="$t('Confirmar nova senha')" type="password"
             :error-messages="formErrors.confirmPassword" class="mb-4" placeholder="Confirme a nova senha" />
         </VForm>
@@ -478,7 +474,6 @@ watch(() => currentUser.value, () => {
     </VCard>
   </VDialog>
 
-  <!-- Diálogos originais (opcionais) -->
   <UserInfoEditDialog v-if="false" v-model:isDialogVisible="isUserInfoEditDialogVisible" :user-data="userProfile" />
   <UserUpgradePlanDialog v-if="false" v-model:isDialogVisible="isUpgradePlanDialogVisible" />
 </template>

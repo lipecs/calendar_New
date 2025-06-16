@@ -491,6 +491,7 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
           return `${day}/${month}/${year}`;
         }
       },
+      
       listMonth: {
         dayHeaderFormat: function(date) {
           const day = date.date.day.toString().padStart(2, '0');
@@ -571,7 +572,6 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
       jsEvent.preventDefault()
       if (clickedEvent.url) window.open(clickedEvent.url, '_blank')
 
-      // ✅ CORRIGIDO: Extrair dados completos do evento clicado
       const eventData = extractEventDataFromEventApi(clickedEvent)
       
       console.log('🖱️ Evento clicado:', {
@@ -592,7 +592,6 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     dateClick(info) {
       console.log('📅 Data clicada:', info.date);
       
-      // ✅ CORRIGIDO: Resetar evento para novo
       event.value = { 
         ...JSON.parse(JSON.stringify(blankEvent)), 
         start: info.date,
@@ -626,7 +625,6 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
     },
   })
 
-  // Garantir que o locale seja sempre pt-br
   watch(locale, newLocale => {
     const fcLocale = 'pt-br'
     
@@ -646,7 +644,6 @@ export const useCalendar = (event, isEventHandlerSidebarActive, isLeftSidebarOpe
   onMounted(() => {
     calendarApi.value = refCalendar.value.getApi()
     
-    // Força configurações de localização após o mount
     if (calendarApi.value) {
       calendarApi.value.setOption('locale', 'pt-br')
     }
