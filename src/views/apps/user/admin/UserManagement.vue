@@ -1,8 +1,8 @@
-<!-- src/views/apps/user/admin/UserManagement.vue - CORRIGIDO -->
+<!-- src/views/apps/user/admin/UserManagement.vue - CORRIGIDO COMPLETO -->
 <script setup>
 import authService from '@/services/auth';
 import userService from '@/services/user';
-import { computed, onMounted, ref, watch } from 'vue'; // ✅ CORREÇÃO: Adicionado watch
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -90,12 +90,12 @@ const fetchUsers = async () => {
 
     // ✅ MELHOR TRATAMENTO DE ERRO
     let errorMessage = 'Erro desconhecido';
-    if (error.response?.data) {
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (error.response?.data) {
       errorMessage = typeof error.response.data === 'string'
         ? error.response.data
         : error.response.data.message || 'Erro no servidor';
-    } else if (error.message) {
-      errorMessage = error.message;
     }
 
     showAlert('error', t('Erro ao carregar usuários') + ': ' + errorMessage);
@@ -158,84 +158,66 @@ const validateForm = () => {
   if (!userForm.value.email.trim()) {
     errors.email = t('O email é obrigatório');
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.value.email)) {
-    errors.email = t('Por favor, insira um email válido');
+    errors.email = t('Email deve ter um formato válido');
   }
 
-  if (!isEditMode.value) {
-    if (!userForm.value.password) {
-      errors.password = t('A senha é obrigatória');
-    } else if (userForm.value.password.length < 6) {
-      errors.password = t('A senha deve ter pelo menos 6 caracteres');
-    }
+  if (!isEditMode.value && !userForm.value.password.trim()) {
+    errors.password = t('A senha é obrigatória');
+  }
 
-    if (userForm.value.password !== userForm.value.confirmPassword) {
-      errors.confirmPassword = t('As senhas não coincidem');
-    }
-  } else if (userForm.value.password && userForm.value.password !== userForm.value.confirmPassword) {
+  if (userForm.value.password && userForm.value.password.length < 6) {
+    errors.password = t('A senha deve ter pelo menos 6 caracteres');
+  }
+
+  if (userForm.value.password !== userForm.value.confirmPassword) {
     errors.confirmPassword = t('As senhas não coincidem');
   }
 
-  // ✅ CORRIGIDO: Validações hierárquicas com logs
-  if (userForm.value.role === 'vendedor') {
-    console.log('🔍 Validando vendedor - Coordenador:', userForm.value.coordenadorId, 'Supervisor:', userForm.value.supervisorId);
-
-    if (!userForm.value.coordenadorId) {
-      errors.coordenadorId = t('Vendedor deve ter um coordenador');
-    }
-    if (!userForm.value.supervisorId) {
-      errors.supervisorId = t('Vendedor deve ter um supervisor');
-    }
+  if (!userForm.value.role.trim()) {
+    errors.role = t('A função é obrigatória');
   }
 
-  if (userForm.value.role === 'coordenador') {
-    console.log('🔍 Validando coordenador - Supervisor:', userForm.value.supervisorId);
-
-    if (!userForm.value.supervisorId) {
-      errors.supervisorId = t('Coordenador deve ter um supervisor');
-    }
+  // Validação de hierarquia
+  if (['coordenador', 'vendedor'].includes(userForm.value.role) && !userForm.value.supervisorId) {
+    errors.supervisorId = t('Um supervisor é obrigatório para esta função');
   }
 
-  console.log('📋 Erros de validação:', errors);
+  if (userForm.value.role === 'vendedor' && !userForm.value.coordenadorId) {
+    errors.coordenadorId = t('Um coordenador é obrigatório para vendedores');
+  }
+
   formErrors.value = errors;
+  console.log('🔍 Erros de validação:', errors);
   return Object.keys(errors).length === 0;
 };
 
-// ✅ CORRIGIDO: Salvar usuário com logs detalhados
+// ✅ CORRIGIDO: Salvar usuário (criar ou editar)
 const saveUser = async () => {
-  console.log('💾 Tentando salvar usuário...');
+  console.log('💾 Salvando usuário...');
 
   if (!validateForm()) {
-    console.log('❌ Validação falhou, parando execução');
+    console.log('❌ Validação falhou');
     return;
   }
 
   try {
     isLoading.value = true;
-    console.log('🔄 Iniciando salvamento...');
 
-    // ✅ VERIFICAÇÃO: Confirmar autenticação
-    if (!authService.isAuthenticated()) {
-      throw new Error('Usuário não autenticado');
-    }
-
+    // Preparar dados do usuário
     const userData = {
-      username: userForm.value.username,
-      email: userForm.value.email,
-      role: userForm.value.role,
+      username: userForm.value.username.trim(),
+      email: userForm.value.email.trim(),
+      role: userForm.value.role.trim(),
       supervisorId: userForm.value.supervisorId,
       coordenadorId: userForm.value.coordenadorId
     };
 
-    // ✅ CORREÇÃO: Sempre incluir password para criação, opcional para edição
-    if (!isEditMode.value) {
-      // Criação: senha é obrigatória
-      userData.password = userForm.value.password;
-    } else if (userForm.value.password && userForm.value.password.trim()) {
-      // Edição: senha só se fornecida
-      userData.password = userForm.value.password;
+    // Adicionar senha apenas se fornecida
+    if (userForm.value.password.trim()) {
+      userData.password = userForm.value.password.trim();
     }
 
-    console.log('📤 Dados que serão enviados:', {
+    console.log('📤 Dados do usuário sendo enviados:', {
       ...userData,
       password: userData.password ? '[OCULTA]' : 'NÃO FORNECIDA'
     });
@@ -266,16 +248,18 @@ const saveUser = async () => {
     // ✅ MELHOR TRATAMENTO DE ERRO
     let errorMessage = 'Erro desconhecido';
 
-    if (error.response?.data) {
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (error.response?.data) {
       if (typeof error.response.data === 'string') {
         errorMessage = error.response.data;
+      } else if (error.response.data.error) {
+        errorMessage = error.response.data.error;
       } else if (error.response.data.message) {
         errorMessage = error.response.data.message;
       } else {
         errorMessage = 'Erro no servidor';
       }
-    } else if (error.message) {
-      errorMessage = error.message;
     }
 
     console.error('📢 Mostrando erro para usuário:', errorMessage);
@@ -299,12 +283,12 @@ const deleteUser = async (userId) => {
     console.error('❌ Erro ao excluir usuário:', error);
 
     let errorMessage = 'Erro desconhecido';
-    if (error.response?.data) {
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (error.response?.data) {
       errorMessage = typeof error.response.data === 'string'
         ? error.response.data
-        : error.response.data.message || 'Erro no servidor';
-    } else if (error.message) {
-      errorMessage = error.message;
+        : error.response.data.error || error.response.data.message || 'Erro no servidor';
     }
 
     showAlert('error', t('Erro ao excluir usuário') + ': ' + errorMessage);
@@ -499,8 +483,13 @@ onMounted(() => {
     </VNavigationDrawer>
   </VCard>
 </template>
+
 <style scoped>
 .scrollable-content {
   overflow-y: auto;
+}
+
+.user-management-drawer {
+  z-index: 2100 !important;
 }
 </style>
