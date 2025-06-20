@@ -1,4 +1,4 @@
-<!-- src/views/apps/user/admin/UserManagement.vue - CORRIGIDO COMPLETO -->
+<!-- src/views/apps/user/admin/UserManagement.vue - CORRIGIDO COMPLETO COM POPUP -->
 <script setup>
 import authService from '@/services/auth';
 import userService from '@/services/user';
@@ -99,14 +99,14 @@ const fetchUsers = async () => {
 };
 
 const openAddUserDrawer = () => {
-  console.log('➕ Abrindo drawer para adicionar usuário');
+  console.log('➕ Abrindo popup para adicionar usuário');
   isEditMode.value = false;
   resetForm();
   isUserDrawerOpen.value = true;
 };
 
 const openEditUserDrawer = (user) => {
-  console.log('✏️ Abrindo drawer para editar usuário:', user.username);
+  console.log('✏️ Abrindo popup para editar usuário:', user.username);
   isEditMode.value = true;
   currentUserId.value = user.id;
 
@@ -398,21 +398,21 @@ onMounted(() => {
       </VDataTable>
     </VCardText>
 
-    <VNavigationDrawer v-model="isUserDrawerOpen" temporary location="end" width="500"
-      class="scrollable-content user-management-drawer" style="z-index: 2100;">
-      <VToolbar color="primary">
-        <VToolbarTitle>{{ isEditMode ? $t('Editar Usuário') : $t('Adicionar Usuário') }}</VToolbarTitle>
-        <template #append>
-          <IconBtn @click="isUserDrawerOpen = false">
-            <VIcon icon="ri-close-line" />
-          </IconBtn>
-        </template>
-      </VToolbar>
+    <!-- POPUP/DIALOG para adicionar/editar usuário -->
+    <VDialog v-model="isUserDrawerOpen" max-width="600px" persistent scrollable>
+      <VCard>
+        <VCardTitle class="pa-6">
+          <div class="d-flex align-center justify-between">
+            <h3>{{ isEditMode ? $t('Editar Usuário') : $t('Adicionar Usuário') }}</h3>
+            <IconBtn @click="isUserDrawerOpen = false">
+              <VIcon icon="ri-close-line" />
+            </IconBtn>
+          </div>
+        </VCardTitle>
 
-      <VDivider />
+        <VDivider />
 
-      <VCard flat>
-        <VCardText>
+        <VCardText class="pa-6">
           <VForm @submit.prevent="saveUser">
             <!-- Nome de usuário -->
             <VTextField v-model="userForm.username" :label="$t('Nome de usuário')" :error-messages="formErrors.username"
@@ -426,11 +426,13 @@ onMounted(() => {
             <VSelect v-model="userForm.role" :items="roles" :label="$t('Função')" item-title="title" item-value="value"
               class="mb-3" :error-messages="formErrors.role" required />
 
+            <!-- Supervisor (condicionalmente visível) -->
             <VSelect v-if="['coordenador', 'vendedor'].includes(userForm.role)" v-model="userForm.supervisorId"
               :items="supervisors" :label="$t('Supervisor Responsável')" item-title="username" item-value="id"
               class="mb-3" :error-messages="formErrors.supervisorId" clearable
               :required="['coordenador', 'vendedor'].includes(userForm.role)" />
 
+            <!-- Coordenador (apenas para vendedores) -->
             <VSelect v-if="userForm.role === 'vendedor'" v-model="userForm.coordenadorId" :items="coordenadores"
               :label="$t('Coordenador Responsável')" item-title="username" item-value="id" class="mb-3"
               :error-messages="formErrors.coordenadorId" clearable required />
@@ -443,30 +445,29 @@ onMounted(() => {
             <VTextField v-model="userForm.confirmPassword"
               :label="isEditMode ? $t('Confirmar nova senha') : $t('Confirmar senha')" type="password"
               :error-messages="formErrors.confirmPassword" class="mb-5" :required="!isEditMode || userForm.password" />
-
-            <!-- Botões de ação -->
-            <div class="d-flex gap-3">
-              <VBtn type="submit" color="primary" :loading="isLoading" :disabled="isLoading">
-                {{ isEditMode ? $t('Atualizar') : $t('Salvar') }}
-              </VBtn>
-
-              <VBtn variant="outlined" color="secondary" @click="isUserDrawerOpen = false">
-                {{ $t('Cancelar') }}
-              </VBtn>
-            </div>
           </VForm>
         </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="pa-6">
+          <VSpacer />
+
+          <VBtn variant="outlined" color="secondary" @click="isUserDrawerOpen = false">
+            {{ $t('Cancelar') }}
+          </VBtn>
+
+          <VBtn color="primary" :loading="isLoading" :disabled="isLoading" @click="saveUser">
+            {{ isEditMode ? $t('Atualizar') : $t('Salvar') }}
+          </VBtn>
+        </VCardActions>
       </VCard>
-    </VNavigationDrawer>
+    </VDialog>
   </VCard>
 </template>
 
 <style scoped>
 .scrollable-content {
   overflow-y: auto;
-}
-
-.user-management-drawer {
-  z-index: 2100 !important;
 }
 </style>
