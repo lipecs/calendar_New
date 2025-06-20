@@ -19,8 +19,11 @@
   "New Event Filter": "New Event Filter",
   "Filter Name": "Filter Name",
   "filters": "Filters",
-  "Users Management":"Users Management",
-
+  "Users Management": "Users Management",
+  "Profiles": "Profiles",
+  "My Profile": "My Profile",
+  "Salesperson": "Salesperson",
+  "Clients": "Clients",
   "selectRole": "Select Role",
   "selectPlan": "Select Plan",
   "selectStatus": "Select Status",
@@ -35,22 +38,16 @@
   "author": "Author",
   "editor": "Editor",
   "maintainer": "Maintainer",
-  
-    "Meeting": "Meeting",
-    "Reminder": "Reminder",
-    "Task": "Task",
-    "Busy": "Busy",
-
-    "In Progress": "In Progress", 
-    "Done": "Done", 
-    "Urgent": "Urgent",
-
-    "Deadline": "Deadline",
-    "Presentation": "Presentation",
-  
-    "High Priority": "High Priority",
-  
-  
+  "Meeting": "Meeting",
+  "Reminder": "Reminder",
+  "Task": "Task",
+  "Busy": "Busy",
+  "In Progress": "In Progress",
+  "Done": "Done",
+  "Urgent": "Urgent",
+  "Deadline": "Deadline",
+  "Presentation": "Presentation",
+  "High Priority": "High Priority",
   "subscriber": "Subscriber",
   "basic": "Basic",
   "company": "Company",
@@ -136,7 +133,11 @@
   "security": "Security",
   "status": "Status",
   "role": "Role",
+  "coordinator": "Coordinator",
   "taxId": "Tax ID",
+  "user_management_description": "Manage System Users.",
+    "user_management": "User Management",
+    
   "contact": "Contact",
   "language": "Language",
   "country": "Country",

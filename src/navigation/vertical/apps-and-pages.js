@@ -6,10 +6,10 @@ export default [
     icon: { icon: 'ri-calendar-line' },
     to: 'apps-calendar',
   },
-  
+
 
   { 
-    heading: 'Administração',
+    heading: 'Administration',
     action: 'manage',
     subject: 'Users',
   },
@@ -23,33 +23,33 @@ export default [
 
 
   { 
-    heading: 'Perfis',
+    heading: 'Profiles',
     // Mostrar seção apenas para admins ou quando houver itens visíveis
   },
   {
-    title: 'Perfil',
+    title: 'Profile',
     icon: { icon: 'ri-user-line' },
     children: [
       { 
-        title: 'Meu Perfil', 
+        title: 'My Profile', 
         to: { name: 'apps-user-view-id', params: { id: 21 } },
         // Sem restrição - todos podem ver o próprio perfil
       },
-      
+
       { 
-        title: 'Vendedor', 
+        title: 'Salesperson', 
         to: { name: 'pages-icons', params: { id: 21 } },
         action: 'manage',
-        subject: 'Vendedores',
+        subject: 'Salespeople',
         // Será filtrado pelo sistema de permissões
         adminOnly: true
       },
 
       { 
-        title: 'Cliente', 
+        title: 'Clients', 
         to: { name: 'pages-pricing', params: { id: 21 } },
         action: 'manage', 
-        subject: 'Clientes',
+        subject: 'clients',
         // Será filtrado pelo sistema de permissões
         adminOnly: true
       },

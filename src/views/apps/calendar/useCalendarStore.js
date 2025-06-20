@@ -4,6 +4,34 @@ import { defineStore } from 'pinia';
 
 const API_URL = 'http://localhost:8080/api';
 
+const parseDate = (dateInput) => {
+  if (!dateInput) return null;
+  
+  if (dateInput instanceof Date) {
+    return dateInput.toISOString();
+  }
+  
+  if (typeof dateInput === 'string') {
+    // Formato brasileiro: dd-mm-yyyy hh:mm
+    const brFormat = /^(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2})$/.test(dateInput);
+    if (brFormat) {
+      const [, day, month, year, hours, minutes] = dateInput.match(/^(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2})$/);
+      return new Date(year, month - 1, day, hours, minutes).toISOString();
+    }
+    
+    // Formato brasileiro: dd-mm-yyyy
+    const brDateOnly = /^(\d{2})-(\d{2})-(\d{4})$/.test(dateInput);
+    if (brDateOnly) {
+      const [, day, month, year] = dateInput.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+      return new Date(year, month - 1, day).toISOString();
+    }
+    
+    return new Date(dateInput).toISOString();
+  }
+  
+  return null;
+};
+
 export const useCalendarStore = defineStore('calendar', {
   state: () => ({
     availableCalendars: [
@@ -18,7 +46,6 @@ export const useCalendarStore = defineStore('calendar', {
   }),
 
   actions: {
-    // ✅ CORRIGIDO: Buscar eventos com controle aprimorado de hierarquia
     async fetchEvents(targetUserId = null) {
       try {
         console.log('📡 Buscando eventos...', { targetUserId });
@@ -37,7 +64,6 @@ export const useCalendarStore = defineStore('calendar', {
         let url = `${API_URL}/events`;
         const params = {};
         
-        // ✅ CORRIGIDO: Lógica de busca baseada na hierarquia
         if (targetUserId) {
           // Buscar eventos de usuário específico (para admins/superiores)
           params.userId = targetUserId;
@@ -46,66 +72,45 @@ export const useCalendarStore = defineStore('calendar', {
           // Admin/Diretor sem filtro = todos os eventos
           console.log('👑 Admin/Diretor visualizando todos os eventos');
         } else if (isSupervisor) {
-          // ✅ NOVO: Supervisor vê eventos dos vendedores sob sua responsabilidade + próprios
           console.log('👥 Supervisor buscando eventos da equipe');
           // Buscar todos os eventos primeiro, filtrar no frontend ou criar endpoint específico
         } else if (isCoordenador) {
-          // ✅ NOVO: Coordenador vê eventos dos vendedores sob sua responsabilidade + próprios
-          console.log('📋 Coordenador buscando eventos da equipe');
-          // Buscar todos os eventos primeiro, filtrar no frontend ou criar endpoint específico
+          console.log('🎯 Coordenador buscando eventos da equipe');
         } else {
           // Vendedor ou usuário comum - apenas próprios eventos
           params.userId = currentUser.userData.id;
-          console.log('👤 Usuário comum visualizando próprios eventos:', currentUser.userData.id);
-        }
-        
-        // Filtro por calendários selecionados
-        if (this.selectedCalendars.length > 0 && this.selectedCalendars.length < this.availableCalendars.length) {
-          params.calendars = this.selectedCalendars.join(',');
+          console.log('👤 Vendedor buscando próprios eventos');
         }
 
-        console.log('📤 Parâmetros da requisição:', { url, params });
-
-        const response = await axios.get(url, { 
+        const response = await axios.get(url, {
           params,
           headers: {
             'X-User-Id': currentUser.userData.id.toString(),
-            'X-User-Role': isAdmin || isDiretor ? 'ADMIN' : 'USER'
+            'X-User-Role': authService.isAdmin() || authService.isDiretor() ? 'ADMIN' : 'USER'
           }
         });
-        
-        console.log('✅ Resposta da API:', response.status, response.data?.length, 'eventos');
-        
+
         if (response.status === 200) {
-          let events = response.data;
-
-          // ✅ NOVO: Filtrar eventos localmente para supervisores e coordenadores
-          if (isSupervisor && !targetUserId) {
-            // Supervisor vê eventos de vendedores sob sua responsabilidade + próprios
-            events = events.filter(event => {
-              return event.userId === currentUser.userData.id || // Próprios eventos
-                     (event.assignedUserId && this.isUserUnderSupervision(event.assignedUserId, currentUser.userData.id, 'supervisor')) ||
-                     this.isUserUnderSupervision(event.userId, currentUser.userData.id, 'supervisor');
-            });
-          } else if (isCoordenador && !targetUserId) {
-            // Coordenador vê eventos de vendedores sob sua responsabilidade + próprios
-            events = events.filter(event => {
-              return event.userId === currentUser.userData.id || // Próprios eventos
-                     (event.assignedUserId && this.isUserUnderSupervision(event.assignedUserId, currentUser.userData.id, 'coordenador')) ||
-                     this.isUserUnderSupervision(event.userId, currentUser.userData.id, 'coordenador');
-            });
-          }
-
-          this.events = events;
+          console.log('✅ Eventos recebidos do backend:', response.data.length);
           
-          console.log('📊 Eventos processados:', events.length, 'eventos finais');
-          console.log('📋 Detalhes dos eventos:', events.map(e => ({
-            id: e.id,
-            title: e.title,
-            userId: e.userId,
-            assignedUserId: e.assignedUserId,
-            client: e.extendedProps?.cliente
-          })));
+          const events = response.data.map(event => ({
+            ...event,
+            start: new Date(event.start),
+            end: new Date(event.end),
+            extendedProps: {
+              calendar: event.extendedProps?.calendar || 'Meeting',
+              location: event.extendedProps?.location || '',
+              status: event.extendedProps?.status || 'In Progress',
+              guests: event.extendedProps?.guests || [],
+              clienteId: event.clientId || event.extendedProps?.clienteId || null,
+              cliente: event.extendedProps?.cliente || '',
+              clienteCode: event.extendedProps?.clienteCode || '',
+              assignedUser: event.assignedUserId || event.extendedProps?.assignedUser || null
+            }
+          }));
+          
+          this.events = events;
+          console.log('✅ Eventos armazenados localmente:', events.length);
           
           return events;
         } else {
@@ -121,7 +126,6 @@ export const useCalendarStore = defineStore('calendar', {
           headers: error.response?.headers
         });
         
-        // ✅ NOVO: Tratamento específico de erros
         if (error.response?.status === 401) {
           console.error('🔐 Erro de autenticação - redirecionando para login');
           authService.logout();
@@ -134,7 +138,6 @@ export const useCalendarStore = defineStore('calendar', {
       }
     },
 
-    // ✅ NOVO: Método auxiliar para verificar hierarquia
     isUserUnderSupervision(userId, supervisorId, supervisorType) {
       // Este método deveria idealmente vir do backend
       // Por enquanto, vamos assumir que funciona com os dados já carregados
@@ -142,7 +145,6 @@ export const useCalendarStore = defineStore('calendar', {
       return true; // Simplificado - em produção usar dados reais de hierarquia
     },
 
-    // ✅ CORRIGIDO: Adicionar evento com melhor mapeamento
     async addEvent(event) {
       try {
         console.log('➕ Adicionando evento:', event);
@@ -153,17 +155,15 @@ export const useCalendarStore = defineStore('calendar', {
 
         const currentUser = authService.getCurrentUser();
         
-        // ✅ CORRIGIDO: Formatação completa do evento para o backend
         const eventToSend = {
           title: event.title,
           description: event.description || '',
-          start: new Date(event.start).toISOString(),
-          end: new Date(event.end).toISOString(),
+          start: parseDate(event.start), // ← CORREÇÃO AQUI
+          end: parseDate(event.end),     // ← CORREÇÃO AQUI
           allDay: event.allDay || false,
           url: event.url || '',
           userId: event.userId || currentUser.userData.id,
           
-          // ✅ NOVO: Campos específicos para o backend
           clientId: event.clientId || null,
           assignedUserId: event.assignedUserId || null,
           
@@ -174,7 +174,6 @@ export const useCalendarStore = defineStore('calendar', {
             status: event.extendedProps?.status || 'In Progress',
             guests: event.extendedProps?.guests || [],
             
-            // ✅ CORRIGIDO: Manter dados do frontend
             clienteId: event.extendedProps?.clienteId || null,
             cliente: event.extendedProps?.cliente || '',
             clienteCode: event.extendedProps?.clienteCode || '',
@@ -182,9 +181,10 @@ export const useCalendarStore = defineStore('calendar', {
           }
         };
 
-        // ✅ CORRIGIDO: Log detalhado do que está sendo enviado
         console.log('➕ Evento formatado para backend:', {
           title: eventToSend.title,
+          start: eventToSend.start,
+          end: eventToSend.end,
           userId: eventToSend.userId,
           clientId: eventToSend.clientId,
           assignedUserId: eventToSend.assignedUserId,
@@ -200,7 +200,6 @@ export const useCalendarStore = defineStore('calendar', {
         
         console.log('✅ Evento criado no backend:', response.data);
         
-        // ✅ CORRIGIDO: Processar resposta do backend
         if (response.data) {
           const processedEvent = this.processEventFromBackend(response.data);
           this.events.push(processedEvent);
@@ -220,7 +219,6 @@ export const useCalendarStore = defineStore('calendar', {
       }
     },
 
-    // ✅ CORRIGIDO: Atualizar evento
     async updateEvent(event) {
       try {
         console.log('✏️ Atualizando evento:', event);
@@ -231,18 +229,16 @@ export const useCalendarStore = defineStore('calendar', {
 
         const currentUser = authService.getCurrentUser();
 
-        // ✅ CORRIGIDO: Formatação similar ao addEvent
         const eventToSend = {
           id: event.id,
           title: event.title,
           description: event.description || '',
-          start: new Date(event.start).toISOString(),
-          end: new Date(event.end).toISOString(),
+          start: parseDate(event.start), 
+          end: parseDate(event.end),    
           allDay: event.allDay || false,
           url: event.url || '',
           userId: event.userId,
           
-          // ✅ NOVO: Campos específicos para o backend
           clientId: event.clientId || null,
           assignedUserId: event.assignedUserId || null,
           
@@ -253,7 +249,6 @@ export const useCalendarStore = defineStore('calendar', {
             status: event.extendedProps?.status || 'In Progress',
             guests: event.extendedProps?.guests || [],
             
-            // ✅ CORRIGIDO: Manter dados do frontend
             clienteId: event.extendedProps?.clienteId || null,
             cliente: event.extendedProps?.cliente || '',
             clienteCode: event.extendedProps?.clienteCode || '',
@@ -272,7 +267,6 @@ export const useCalendarStore = defineStore('calendar', {
         
         console.log('✅ Evento atualizado no backend:', response.data);
         
-        // ✅ CORRIGIDO: Atualizar evento local
         const index = this.events.findIndex(e => e.id === event.id);
         if (index !== -1) {
           const processedEvent = this.processEventFromBackend(response.data);
@@ -287,7 +281,6 @@ export const useCalendarStore = defineStore('calendar', {
       }
     },
 
-    // ✅ CORRIGIDO: Remover evento
     async removeEvent(eventId) {
       try {
         console.log('🗑️ Removendo evento:', eventId);
@@ -307,7 +300,6 @@ export const useCalendarStore = defineStore('calendar', {
         
         console.log('✅ Evento removido do backend');
         
-        // ✅ CORRIGIDO: Remover evento local
         const index = this.events.findIndex(e => e.id === parseInt(eventId));
         if (index !== -1) {
           this.events.splice(index, 1);
@@ -321,21 +313,18 @@ export const useCalendarStore = defineStore('calendar', {
       }
     },
 
-    // ✅ NOVO: Método para processar eventos vindos do backend
     processEventFromBackend(backendEvent) {
       const processedEvent = {
         ...backendEvent,
         start: new Date(backendEvent.start),
         end: new Date(backendEvent.end),
         
-        // ✅ CORRIGIDO: Garantir que extendedProps está completo
         extendedProps: {
           calendar: backendEvent.extendedProps?.calendar || 'Meeting',
           location: backendEvent.extendedProps?.location || '',
           status: backendEvent.extendedProps?.status || 'In Progress',
           guests: backendEvent.extendedProps?.guests || [],
           
-          // ✅ NOVO: Mapear campos do backend para frontend
           clienteId: backendEvent.clientId || backendEvent.extendedProps?.clienteId || null,
           cliente: backendEvent.extendedProps?.cliente || '',
           clienteCode: backendEvent.extendedProps?.clienteCode || '',
@@ -343,7 +332,6 @@ export const useCalendarStore = defineStore('calendar', {
         }
       };
 
-      // ✅ NOVO: Garantir compatibilidade com campos alternativos
       if (backendEvent.clientId && !processedEvent.extendedProps.clienteId) {
         processedEvent.extendedProps.clienteId = backendEvent.clientId;
       }

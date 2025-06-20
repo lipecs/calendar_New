@@ -35,7 +35,6 @@ const userForm = ref({
 // Erros de validação
 const formErrors = ref({});
 
-// ✅ CORRIGIDO: Opções de papéis baseadas na hierarquia do usuário atual
 const roles = computed(() => {
   const currentUserLevel = authService.getHierarchyLevel();
   const allRoles = [
@@ -49,35 +48,31 @@ const roles = computed(() => {
   return allRoles.filter(role => role.level <= currentUserLevel);
 });
 
-// ✅ CORRIGIDO: Lista de supervisores
 const supervisors = computed(() => {
   return users.value.filter(user =>
     user.role === 'supervisor' || user.role === 'diretor' || user.role === 'admin'
   );
 });
 
-// ✅ CORRIGIDO: Lista de coordenadores
 const coordenadores = computed(() => {
   return users.value.filter(user => user.role === 'coordenador');
 });
 
 // Headers da tabela
 const headers = computed(() => [
-  { title: t('Usuário'), key: 'username' },
+  { title: t('User'), key: 'username' },
   { title: t('Email'), key: 'email' },
-  { title: t('Função'), key: 'role' },
+  { title: t('role'), key: 'role' },
   { title: t('Supervisor'), key: 'supervisor' },
-  { title: t('Coordenador'), key: 'coordenador' },
-  { title: t('Ações'), key: 'actions', sortable: false }
+  { title: t('coordinator'), key: 'coordenador' },
+  { title: t('actions'), key: 'actions', sortable: false }
 ]);
 
-// ✅ CORRIGIDO: Carrega usuários com melhor tratamento de erro
 const fetchUsers = async () => {
   try {
     console.log('🔄 Carregando usuários...');
     isLoading.value = true;
 
-    // ✅ VERIFICAÇÃO: Confirmar se usuário está autenticado
     if (!authService.isAuthenticated()) {
       throw new Error('Usuário não autenticado');
     }
@@ -88,7 +83,6 @@ const fetchUsers = async () => {
   } catch (error) {
     console.error('❌ Erro ao buscar usuários:', error);
 
-    // ✅ MELHOR TRATAMENTO DE ERRO
     let errorMessage = 'Erro desconhecido';
     if (error.message) {
       errorMessage = error.message;
@@ -104,7 +98,6 @@ const fetchUsers = async () => {
   }
 };
 
-// Abrir o drawer para adicionar novo usuário
 const openAddUserDrawer = () => {
   console.log('➕ Abrindo drawer para adicionar usuário');
   isEditMode.value = false;
@@ -112,7 +105,6 @@ const openAddUserDrawer = () => {
   isUserDrawerOpen.value = true;
 };
 
-// Abrir o drawer para editar usuário existente
 const openEditUserDrawer = (user) => {
   console.log('✏️ Abrindo drawer para editar usuário:', user.username);
   isEditMode.value = true;
@@ -146,7 +138,6 @@ const resetForm = () => {
   formErrors.value = {};
 };
 
-// ✅ CORRIGIDO: Validação com logs para debug
 const validateForm = () => {
   console.log('🔍 Validando formulário:', userForm.value);
   const errors = {};
@@ -191,7 +182,6 @@ const validateForm = () => {
   return Object.keys(errors).length === 0;
 };
 
-// ✅ CORRIGIDO: Salvar usuário (criar ou editar)
 const saveUser = async () => {
   console.log('💾 Salvando usuário...');
 
@@ -245,7 +235,6 @@ const saveUser = async () => {
       status: error.response?.status
     });
 
-    // ✅ MELHOR TRATAMENTO DE ERRO
     let errorMessage = 'Erro desconhecido';
 
     if (error.message) {
@@ -297,21 +286,18 @@ const deleteUser = async (userId) => {
   }
 };
 
-// ✅ CORRIGIDO: Obter nome do supervisor
 const getSupervisorName = (user) => {
   if (!user.supervisorId) return t('-');
   const supervisor = users.value.find(u => u.id === user.supervisorId);
   return supervisor ? supervisor.username : t('Não encontrado');
 };
 
-// ✅ CORRIGIDO: Obter nome do coordenador
 const getCoordenadorName = (user) => {
   if (!user.coordenadorId) return t('-');
   const coordenador = users.value.find(u => u.id === user.coordenadorId);
   return coordenador ? coordenador.username : t('Não encontrado');
 };
 
-// ✅ NOVO: Cores dos papéis
 const getRoleColor = (role) => {
   const colors = {
     'admin': 'error',
@@ -324,7 +310,6 @@ const getRoleColor = (role) => {
   return colors[role] || 'secondary';
 };
 
-// ✅ CORRIGIDO: Mostrar alerta com log
 const showAlert = (type, message) => {
   console.log(`📢 Alerta ${type}:`, message);
   alert.value = {
@@ -338,7 +323,6 @@ const showAlert = (type, message) => {
   }, 5000);
 };
 
-// ✅ CORRIGIDO: Watch para limpar coordenador quando role muda
 watch(() => userForm.value.role, (newRole, oldRole) => {
   console.log('🔄 Role mudou de', oldRole, 'para', newRole);
 
@@ -352,7 +336,6 @@ watch(() => userForm.value.role, (newRole, oldRole) => {
   }
 });
 
-// ✅ CORRIGIDO: Carregar usuários ao montar o componente
 onMounted(() => {
   console.log('🚀 Componente montado, carregando usuários...');
   fetchUsers();
@@ -362,7 +345,7 @@ onMounted(() => {
 <template>
   <VCard>
     <VCardTitle class="d-flex justify-space-between align-center flex-wrap">
-      {{ $t('Gerencie os usuários do sistema, atribuindo funções e permissões adequadas.') }}
+      {{ $t('user_management_description') }}
       <VBtn color="primary" prepend-icon="ri-user-add-line" @click="openAddUserDrawer">
         {{ $t('Adicionar Usuário') }}
       </VBtn>
@@ -385,12 +368,10 @@ onMounted(() => {
           </VChip>
         </template>
 
-        <!-- ✅ CORRIGIDO: Template para supervisor -->
         <template #item.supervisor="{ item }">
           <span class="text-sm">{{ getSupervisorName(item) }}</span>
         </template>
 
-        <!-- ✅ CORRIGIDO: Template para coordenador -->
         <template #item.coordenador="{ item }">
           <span class="text-sm">{{ getCoordenadorName(item) }}</span>
         </template>
@@ -408,7 +389,6 @@ onMounted(() => {
           </div>
         </template>
 
-        <!-- ✅ NOVO: Template para quando não há usuários -->
         <template #no-data>
           <div class="text-center py-4">
             <VIcon icon="ri-user-line" size="48" class="mb-2 text-disabled" />
@@ -418,7 +398,6 @@ onMounted(() => {
       </VDataTable>
     </VCardText>
 
-    <!-- ✅ CORRIGIDO: Drawer com z-index adequado -->
     <VNavigationDrawer v-model="isUserDrawerOpen" temporary location="end" width="500"
       class="scrollable-content user-management-drawer" style="z-index: 2100;">
       <VToolbar color="primary">
@@ -447,13 +426,11 @@ onMounted(() => {
             <VSelect v-model="userForm.role" :items="roles" :label="$t('Função')" item-title="title" item-value="value"
               class="mb-3" :error-messages="formErrors.role" required />
 
-            <!-- ✅ CORRIGIDO: Supervisor (condicionalmente visível) -->
             <VSelect v-if="['coordenador', 'vendedor'].includes(userForm.role)" v-model="userForm.supervisorId"
               :items="supervisors" :label="$t('Supervisor Responsável')" item-title="username" item-value="id"
               class="mb-3" :error-messages="formErrors.supervisorId" clearable
               :required="['coordenador', 'vendedor'].includes(userForm.role)" />
 
-            <!-- ✅ CORRIGIDO: Coordenador (apenas para vendedores) -->
             <VSelect v-if="userForm.role === 'vendedor'" v-model="userForm.coordenadorId" :items="coordenadores"
               :label="$t('Coordenador Responsável')" item-title="username" item-value="id" class="mb-3"
               :error-messages="formErrors.coordenadorId" clearable required />

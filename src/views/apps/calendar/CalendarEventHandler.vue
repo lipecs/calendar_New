@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import authService from '@/services/auth'
 import clientService from '@/services/client'
 import userService from '@/services/user'
 import avatar1 from '@images/avatars/avatar-1.png'
 import { Portuguese } from "flatpickr/dist/l10n/pt.js"
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { VForm } from 'vuetify/components/VForm'
 import { useCalendarStore } from './useCalendarStore'
@@ -98,7 +98,7 @@ const loadClients = async () => {
   try {
     isLoadingClients.value = true
     const clients = await clientService.getAvailableClients()
-    
+
     availableClients.value = clients.map(client => ({
       id: client.id,
       name: client.name,
@@ -113,7 +113,7 @@ const loadClients = async () => {
   } catch (error) {
     console.error('Erro ao carregar clientes:', error)
     showAlert('warning', 'Erro ao carregar clientes, usando dados simulados')
-    
+
     // Fallback para dados simulados
     availableClients.value = [
       { id: 1, name: 'Empresa ABC Ltda', code: 'CLI001', displayName: 'Empresa ABC Ltda (CLI001)', vendedorId: null },
@@ -164,7 +164,7 @@ watch(() => props.isDrawerOpen, async (newValue) => {
 watch(() => props.event, (newEvent) => {
   if (newEvent) {
     event.value = JSON.parse(JSON.stringify(newEvent))
-    
+
     // ✅ CORRIGIDO: Carregar clientes se não estiverem carregados
     if (event.value.extendedProps?.clienteId && availableClients.value.length === 0) {
       loadClients()
@@ -200,13 +200,13 @@ const handleSubmit = () => {
 
       // ✅ CORRIGIDO: Determinar o userId correto
       let targetUserId = authService.getCurrentUser().userData.id
-      
+
       // Se é criação para outro usuário (supervisor/coordenador/diretor/admin)
       if (canCreateForOthers.value && event.value.extendedProps?.assignedUser) {
         targetUserId = parseInt(event.value.extendedProps.assignedUser)
         console.log('👤 Atribuindo evento ao vendedor:', targetUserId)
       }
-      
+
       // Garantir que o userId está definido
       event.value.userId = targetUserId
 
@@ -265,7 +265,7 @@ const onCancel = () => {
 const startDateTimePickerConfig = computed(() => {
   const config = {
     enableTime: !event.value.allDay,
-    dateFormat: `Y-m-d${event.value.allDay ? '' : ' H:i'}`,
+    dateFormat: `d-m-Y${event.value.allDay ? '' : ' H:i'}`,
     locale: Portuguese,
   }
   if (event.value.end) config.maxDate = event.value.end
@@ -275,7 +275,7 @@ const startDateTimePickerConfig = computed(() => {
 const endDateTimePickerConfig = computed(() => {
   const config = {
     enableTime: !event.value.allDay,
-    dateFormat: `Y-m-d${event.value.allDay ? '' : ' H:i'}`,
+    dateFormat: `d-m-Y${event.value.allDay ? '' : ' H:i'}`,
     locale: Portuguese,
   }
   if (event.value.start) config.minDate = event.value.start
@@ -308,29 +308,29 @@ const selectedClientDisplay = computed(() => {
 const filteredClients = computed(() => {
   const currentUser = authService.getCurrentUser()
   const currentUserLevel = authService.getHierarchyLevel()
-  
+
   // Se é vendedor, vê apenas seus clientes
   if (authService.isVendedor()) {
-    return availableClients.value.filter(client => 
-      client.vendedorId === currentUser.userData.id || 
+    return availableClients.value.filter(client =>
+      client.vendedorId === currentUser.userData.id ||
       client.vendedorId === null // Clientes não atribuídos
     )
   }
-  
+
   // Se selecionou um vendedor específico, filtrar por ele
   if (event.value.extendedProps?.assignedUser) {
     const selectedUserId = parseInt(event.value.extendedProps.assignedUser)
-    return availableClients.value.filter(client => 
-      client.vendedorId === selectedUserId || 
+    return availableClients.value.filter(client =>
+      client.vendedorId === selectedUserId ||
       client.vendedorId === null // Clientes não atribuídos
     )
   }
-  
+
   // Para coordenador, supervisor, diretor e admin - todos os clientes da hierarquia
   if (currentUserLevel >= 2) {
     return availableClients.value
   }
-  
+
   return availableClients.value
 })
 
