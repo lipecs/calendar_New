@@ -55,7 +55,7 @@ class ClientService {
     }
   }
 
-  // ✅ CORRIGIDO: Buscar cliente por ID
+  // 
   async getClientById(id) {
     try {
       console.log('🔍 Buscando cliente ID:', id);

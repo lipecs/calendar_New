@@ -27,11 +27,22 @@ export default [
   //   to: 'forms-form-layouts',
   // },
   {
-    title: 'Forms',
-    icon: { icon: 'ri-survey-line' },
-    to: 'forms-form-wizard-numbered',
-    
-  },
+  title: 'Formulários',
+  icon: { icon: 'ri-file-list-2-line' },
+  children: [
+    {
+      title: 'Gerenciar',
+      to: 'formularios',
+      icon: { icon: 'ri-settings-2-line' }
+    },
+    {
+      title: 'Responder',
+      to: 'responder',
+      icon: { icon: 'ri-file-check-line' }
+    }
+  ]
+},
+
   // {
   //   title: 'Form Validation',
   //   icon: { icon: 'ri-checkbox-multiple-line' },

@@ -6,7 +6,6 @@ import authService from './auth';
 const API_URL = 'http://localhost:8080/api/events';
 
 class EventService {
-  // 👉 Função para converter data BR para ISO
   convertBRDateToISO(brDate) {
     if (!brDate) return null;
     
@@ -20,7 +19,6 @@ class EventService {
         const [, day, month, year, hours, minutes] = match;
         return new Date(year, month - 1, day, hours, minutes).toISOString();
       }
-      
       match = brDate.match(dateOnlyRegex);
       if (match) {
         const [, day, month, year] = match;
@@ -36,7 +34,7 @@ class EventService {
     }
   }
 
-  // 👉 Função para converter ISO para formato BR
+  //
   convertISOToBRDate(isoDate, allDay = false) {
     if (!isoDate) return '';
     
@@ -62,13 +60,13 @@ class EventService {
     }
   }
 
-  // ✅ CORRIGIDO: Preparar evento para envio ao servidor
+  // Preparar evento para envio ao servidor
   prepareEventForServer(eventData) {
     const preparedEvent = { ...eventData };
     
-    console.log('🔄 Preparando evento para servidor:', preparedEvent);
+    console.log('Preparando evento para servidor:', preparedEvent);
     
-    // ✅ CORRIGIDO: Converter datas para ISO se necessário
+    //converter datas para ISO se necessário
     if (preparedEvent.start) {
       if (typeof preparedEvent.start === 'string' && preparedEvent.start.includes('/')) {
         const isoDate = this.convertBRDateToISO(preparedEvent.start);
@@ -86,22 +84,19 @@ class EventService {
         preparedEvent.end = preparedEvent.end.toISOString();
       }
     }
-    
-    // ✅ CORRIGIDO: Garantir que campos específicos estão mapeados corretamente
+    //
     if (preparedEvent.extendedProps?.clienteId && !preparedEvent.clientId) {
       preparedEvent.clientId = parseInt(preparedEvent.extendedProps.clienteId);
     }
-    
     if (preparedEvent.extendedProps?.assignedUser && !preparedEvent.assignedUserId) {
       preparedEvent.assignedUserId = parseInt(preparedEvent.extendedProps.assignedUser);
     }
     
-    // ✅ NOVO: Garantir que extendedProps existe
     if (!preparedEvent.extendedProps) {
       preparedEvent.extendedProps = {};
     }
-    
-    console.log('✅ Evento preparado:', {
+
+    console.log('Evento preparado:', {
       id: preparedEvent.id,
       title: preparedEvent.title,
       userId: preparedEvent.userId,
@@ -114,13 +109,11 @@ class EventService {
     return preparedEvent;
   }
 
-  // ✅ CORRIGIDO: Processar evento recebido do servidor
   processEventFromServer(event) {
     const processedEvent = { ...event };
     
-    console.log('🔄 Processando evento do servidor:', event);
-    
-    // ✅ CORRIGIDO: Converter datas ISO para objetos Date (FullCalendar espera Date objects)
+    console.log('Processando evento do servidor:', event);
+
     if (processedEvent.start) {
       processedEvent.start = new Date(processedEvent.start);
     }
@@ -129,12 +122,10 @@ class EventService {
       processedEvent.end = new Date(processedEvent.end);
     }
     
-    // ✅ CORRIGIDO: Garantir que extendedProps está completo
     if (!processedEvent.extendedProps) {
       processedEvent.extendedProps = {};
     }
     
-    // ✅ NOVO: Mapear campos do backend para o frontend
     if (event.clientId && !processedEvent.extendedProps.clienteId) {
       processedEvent.extendedProps.clienteId = event.clientId;
     }
@@ -143,7 +134,6 @@ class EventService {
       processedEvent.extendedProps.assignedUser = event.assignedUserId;
     }
     
-    // ✅ NOVO: Garantir campos padrão
     processedEvent.extendedProps = {
       calendar: processedEvent.extendedProps.calendar || 'Meeting',
       location: processedEvent.extendedProps.location || '',
@@ -155,7 +145,7 @@ class EventService {
       ...processedEvent.extendedProps
     };
     
-    console.log('✅ Evento processado:', {
+    console.log('Evento processado:', {
       id: processedEvent.id,
       title: processedEvent.title,
       userId: processedEvent.userId,
@@ -317,7 +307,7 @@ class EventService {
     }
   }
 
-  // Método para obter estatísticas de eventos por usuário
+  //
   async getUserEventStats(userId) {
     try {
       const events = await this.getEventsByUserId(userId);
@@ -336,7 +326,6 @@ class EventService {
     }
   }
 
-  // Método auxiliar para agrupar eventos por categoria
   groupEventsByCategory(events) { 
     const categories = {};
     events.forEach(event => {
@@ -346,7 +335,6 @@ class EventService {
     return categories;
   }
 
-  // Método para buscar eventos com filtros avançados
   async getEventsWithFilters(filters = {}) {
     try {
       authService.isAuthenticated();
@@ -356,7 +344,6 @@ class EventService {
         headers: this.getAuthHeaders()
       });
       
-      // ✅ CORRIGIDO: Processar eventos recebidos do servidor
       const processedEvents = response.data.map(event => this.processEventFromServer(event));
       return processedEvents;
     } catch (error) {
@@ -365,7 +352,7 @@ class EventService {
     }
   }
 
-  // Método para exportar eventos para CSV
+  //
   exportEventsAsCSV(events, filename = 'eventos.csv') {
     const headers = ['Título', 'Cliente', 'Vendedor', 'Início', 'Fim', 'Status', 'Categoria', 'Descrição'];
     const csvContent = [

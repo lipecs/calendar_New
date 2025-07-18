@@ -311,7 +311,7 @@ const getRoleColor = (role) => {
 };
 
 const showAlert = (type, message) => {
-  console.log(`📢 Alerta ${type}:`, message);
+  console.log(`Alerta ${type}:`, message);
   alert.value = {
     show: true,
     type,
@@ -324,7 +324,7 @@ const showAlert = (type, message) => {
 };
 
 watch(() => userForm.value.role, (newRole, oldRole) => {
-  console.log('🔄 Role mudou de', oldRole, 'para', newRole);
+  console.log('Role mudou de', oldRole, 'para', newRole);
 
   if (['supervisor', 'diretor', 'admin'].includes(newRole)) {
     console.log('🧹 Limpando supervisor e coordenador para papel superior');

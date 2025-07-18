@@ -53,7 +53,7 @@ class AuthService {
     }
   }
 
-  // ✅ NOVO: Método para converter role para header
+  //  Método para converter role para header
   getUserRoleHeader(role) {
     const roleMap = {
       'admin': 'ADMIN',
@@ -86,13 +86,13 @@ class AuthService {
     }
   }
 
-  // ✅ ATUALIZADO: Verificação de admin incluindo diretor
+  //  Verificação de admin incluindo diretor
   isAdmin() {
     const user = this.getCurrentUser();
     return user && user.userData && (user.userData.role === 'admin' || user.userData.role === 'diretor');
   }
 
-  // ✅ NOVO: Verificações específicas de papéis
+  // verificações específicas de papéis
   isDiretor() {
     const user = this.getCurrentUser();
     return user && user.userData && user.userData.role === 'diretor';

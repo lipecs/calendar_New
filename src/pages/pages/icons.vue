@@ -1,11 +1,11 @@
 <!-- src/pages/pages/icons.vue - ATUALIZADO para Painel de Vendedores -->
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import authService from '@/services/auth';
-import userService from '@/services/user';
 import eventService from '@/services/event';
+import userService from '@/services/user';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -86,7 +86,7 @@ const filteredEvents = computed(() => {
 
   // Filtro por status
   if (statusFilter.value !== 'all') {
-    events = events.filter(event => 
+    events = events.filter(event =>
       event.extendedProps?.status === statusFilter.value
     );
   }
@@ -95,10 +95,10 @@ const filteredEvents = computed(() => {
   if (dateFilter.value !== 'all') {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+
     events = events.filter(event => {
       const eventDate = new Date(event.start);
-      
+
       switch (dateFilter.value) {
         case 'today':
           return eventDate >= today && eventDate < new Date(today.getTime() + 24 * 60 * 60 * 1000);
@@ -116,7 +116,7 @@ const filteredEvents = computed(() => {
 
   // Filtro por busca
   if (searchQuery.value) {
-    events = events.filter(event => 
+    events = events.filter(event =>
       event.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       event.description?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       event.extendedProps?.cliente?.toLowerCase().includes(searchQuery.value.toLowerCase())
@@ -147,45 +147,42 @@ const vendedorStats = computed(() => {
   };
 });
 
-// ✅ NOVO: Carregar vendedores baseado na hierarquia
+//
 const fetchVendedores = async () => {
   try {
     isLoadingVendedores.value = true;
-    
+
     const currentUser = authService.getCurrentUser();
     const currentUserLevel = authService.getHierarchyLevel();
-    
+
     // Buscar todos os usuários
     const allUsers = await userService.getAllUsers();
-    
+
     // Filtrar vendedores baseado na hierarquia
     let filteredVendedores = allUsers.filter(user => user.role === 'vendedor');
-    
+
     if (currentUserLevel === 3) {
       // Supervisor vê apenas vendedores sob sua responsabilidade
-      filteredVendedores = filteredVendedores.filter(vendedor => 
-        vendedor.supervisorId === currentUser.userData.id
-      );
+      filteredVendedores = filteredVendedores.filter(vendedor =>
+        vendedor.supervisorId === currentUser.userData.id);
     } else if (currentUserLevel === 2) {
       // Coordenador vê apenas vendedores sob sua responsabilidade
-      filteredVendedores = filteredVendedores.filter(vendedor => 
+      filteredVendedores = filteredVendedores.filter(vendedor =>
         vendedor.coordenadorId === currentUser.userData.id
       );
     }
-    // Admin e Diretor veem todos os vendedores
-    
-    // Carregar estatísticas para cada vendedor
+    //
     const vendedoresWithStats = await Promise.all(
       filteredVendedores.map(async (vendedor) => {
         try {
           const events = await eventService.getEventsByUserId(vendedor.id);
-          
+
           // Simular clientes ativos (em produção viria do backend)
           const clientCount = Math.floor(Math.random() * 20) + 5;
-          
+
           // Buscar dados do coordenador
           const coordenador = allUsers.find(u => u.id === vendedor.coordenadorId);
-          
+
           return {
             ...vendedor,
             eventCount: events.length,
@@ -207,7 +204,7 @@ const fetchVendedores = async () => {
         }
       })
     );
-    
+
     vendedores.value = vendedoresWithStats;
   } catch (error) {
     console.error('Erro ao carregar vendedores:', error);
@@ -217,21 +214,20 @@ const fetchVendedores = async () => {
   }
 };
 
-// Carregar eventos de um vendedor específico
+//
 const fetchVendedorEvents = async (vendedorId) => {
   try {
     isLoadingEvents.value = true;
     const events = await eventService.getEventsByUserId(vendedorId);
-    
-    // ✅ NOVO: Adicionar dados do cliente aos eventos (simulado)
+
     const eventsWithClient = events.map(event => ({
       ...event,
       extendedProps: {
         ...event.extendedProps,
-        cliente: `Cliente ${Math.floor(Math.random() * 100) + 1}` // Simulado
+        cliente: `Cliente ${Math.floor(Math.random() * 100) + 1}` //
       }
     }));
-    
+
     vendedorEvents.value = eventsWithClient;
   } catch (error) {
     console.error('Erro ao carregar eventos do vendedor:', error);
@@ -242,7 +238,6 @@ const fetchVendedorEvents = async (vendedorId) => {
   }
 };
 
-// ✅ NOVO: Carregar clientes do vendedor
 const fetchVendedorClients = async (vendedorId) => {
   try {
     // Simular carregamento de clientes (em produção viria do backend)
@@ -359,12 +354,12 @@ onMounted(async () => {
     router.push('/login');
     return;
   }
-  
+
   if (!canManageVendedores.value) {
     router.push('/not-authorized');
     return;
   }
-  
+
   await fetchVendedores();
 });
 
@@ -386,12 +381,7 @@ watch([statusFilter, dateFilter, searchQuery], () => {
               {{ $t('Visualize e gerencie os vendedores e seus agendamentos') }}
             </p>
           </div>
-          <VBtn
-            color="primary"
-            prepend-icon="ri-refresh-line"
-            @click="fetchVendedores"
-            :loading="isLoadingVendedores"
-          >
+          <VBtn color="primary" prepend-icon="ri-refresh-line" @click="fetchVendedores" :loading="isLoadingVendedores">
             {{ $t('Atualizar') }}
           </VBtn>
         </div>
@@ -399,13 +389,7 @@ watch([statusFilter, dateFilter, searchQuery], () => {
     </VRow>
 
     <!-- Alerta -->
-    <VAlert
-      v-if="alert.show"
-      :type="alert.type"
-      closable
-      class="mb-4"
-      @click:close="alert.show = false"
-    >
+    <VAlert v-if="alert.show" :type="alert.type" closable class="mb-4" @click:close="alert.show = false">
       {{ alert.message }}
     </VAlert>
 
@@ -415,27 +399,14 @@ watch([statusFilter, dateFilter, searchQuery], () => {
         <VCard>
           <VCardTitle class="d-flex justify-space-between align-center">
             {{ $t('Lista de Vendedores') }}
-            <VTextField
-              v-model="searchQuery"
-              :label="$t('Buscar vendedor...')"
-              prepend-inner-icon="ri-search-line"
-              variant="outlined"
-              density="compact"
-              hide-details
-              clearable
-              style="max-width: 300px;"
-            />
+            <VTextField v-model="searchQuery" :label="$t('Buscar vendedor...')" prepend-inner-icon="ri-search-line"
+              variant="outlined" density="compact" hide-details clearable style="max-width: 300px;" />
           </VCardTitle>
-          
+
           <VDivider />
-          
-          <VDataTable
-            :headers="vendedorHeaders"
-            :items="vendedores"
-            :loading="isLoadingVendedores"
-            class="elevation-1"
-            :items-per-page="10"
-          >
+
+          <VDataTable :headers="vendedorHeaders" :items="vendedores" :loading="isLoadingVendedores" class="elevation-1"
+            :items-per-page="10">
             <!-- Template para vendedor -->
             <template #item.username="{ item }">
               <div class="d-flex align-center">
@@ -452,7 +423,7 @@ watch([statusFilter, dateFilter, searchQuery], () => {
                 </div>
               </div>
             </template>
-            
+
             <!-- Template para coordenador -->
             <template #item.coordenador="{ item }">
               <div v-if="item.coordenador" class="d-flex align-center">
@@ -472,36 +443,25 @@ watch([statusFilter, dateFilter, searchQuery], () => {
                 {{ $t('Não Atribuído') }}
               </VChip>
             </template>
-            
+
             <!-- Template para contagem de eventos -->
             <template #item.eventCount="{ item }">
-              <VChip
-                :color="item.eventCount > 0 ? 'info' : 'default'"
-                size="small"
-              >
+              <VChip :color="item.eventCount > 0 ? 'info' : 'default'" size="small">
                 {{ item.eventCount }}
               </VChip>
             </template>
-            
+
             <!-- Template para contagem de clientes -->
             <template #item.clientCount="{ item }">
-              <VChip
-                :color="item.clientCount > 0 ? 'success' : 'default'"
-                size="small"
-              >
+              <VChip :color="item.clientCount > 0 ? 'success' : 'default'" size="small">
                 {{ item.clientCount }}
               </VChip>
             </template>
-            
+
             <!-- Template para ações -->
             <template #item.actions="{ item }">
-              <VBtn
-                color="primary"
-                variant="outlined"
-                size="small"
-                prepend-icon="ri-eye-line"
-                @click="selectVendedor(item)"
-              >
+              <VBtn color="primary" variant="outlined" size="small" prepend-icon="ri-eye-line"
+                @click="selectVendedor(item)">
                 {{ $t('Ver Agendamentos') }}
               </VBtn>
             </template>
@@ -511,13 +471,7 @@ watch([statusFilter, dateFilter, searchQuery], () => {
     </VRow>
 
     <!-- Drawer para visualizar agendamentos do vendedor -->
-    <VNavigationDrawer
-      v-model="isVendedorDrawerOpen"
-      temporary
-      location="end"
-      width="1200"
-      class="scrollable-content"
-    >
+    <VNavigationDrawer v-model="isVendedorDrawerOpen" temporary location="end" width="1200" class="scrollable-content">
       <template v-if="selectedVendedor">
         <!-- Cabeçalho do Drawer -->
         <VToolbar color="primary" dark>
@@ -601,32 +555,16 @@ watch([statusFilter, dateFilter, searchQuery], () => {
           <VCardText>
             <VRow>
               <VCol cols="12" md="4">
-                <VSelect
-                  v-model="statusFilter"
-                  :items="statusOptions"
-                  :label="$t('Status')"
-                  density="compact"
-                  variant="outlined"
-                />
+                <VSelect v-model="statusFilter" :items="statusOptions" :label="$t('Status')" density="compact"
+                  variant="outlined" />
               </VCol>
               <VCol cols="12" md="4">
-                <VSelect
-                  v-model="dateFilter"
-                  :items="dateOptions"
-                  :label="$t('Período')"
-                  density="compact"
-                  variant="outlined"
-                />
+                <VSelect v-model="dateFilter" :items="dateOptions" :label="$t('Período')" density="compact"
+                  variant="outlined" />
               </VCol>
               <VCol cols="12" md="4">
-                <VTextField
-                  v-model="searchQuery"
-                  :label="$t('Buscar agendamentos...')"
-                  prepend-inner-icon="ri-search-line"
-                  density="compact"
-                  variant="outlined"
-                  clearable
-                />
+                <VTextField v-model="searchQuery" :label="$t('Buscar agendamentos...')"
+                  prepend-inner-icon="ri-search-line" density="compact" variant="outlined" clearable />
               </VCol>
             </VRow>
           </VCardText>
@@ -636,26 +574,16 @@ watch([statusFilter, dateFilter, searchQuery], () => {
         <VCard class="ma-4">
           <VCardTitle class="d-flex justify-space-between align-center">
             {{ $t('Agendamentos') }} ({{ filteredEvents.length }})
-            <VBtn
-              color="success"
-              prepend-icon="ri-download-line"
-              size="small"
-              @click="exportToCSV"
-              :disabled="filteredEvents.length === 0"
-            >
+            <VBtn color="success" prepend-icon="ri-download-line" size="small" @click="exportToCSV"
+              :disabled="filteredEvents.length === 0">
               {{ $t('Exportar CSV') }}
             </VBtn>
           </VCardTitle>
-          
+
           <VDivider />
-          
-          <VDataTable
-            :headers="eventHeaders"
-            :items="filteredEvents"
-            :loading="isLoadingEvents"
-            class="elevation-0"
-            :items-per-page="25"
-          >
+
+          <VDataTable :headers="eventHeaders" :items="filteredEvents" :loading="isLoadingEvents" class="elevation-0"
+            :items-per-page="25">
             <!-- Template para título -->
             <template #item.title="{ item }">
               <div>
@@ -665,59 +593,47 @@ watch([statusFilter, dateFilter, searchQuery], () => {
                 </div>
               </div>
             </template>
-            
+
             <!-- ✅ NOVO: Template para cliente -->
             <template #item.cliente="{ item }">
-              <VChip
-                color="primary"
-                size="small"
-                variant="tonal"
-              >
+              <VChip color="primary" size="small" variant="tonal">
                 {{ item.extendedProps?.cliente || $t('Sem cliente') }}
               </VChip>
             </template>
-            
+
             <!-- Template para data de início -->
             <template #item.start="{ item }">
               <div class="text-no-wrap">
                 {{ formatDate(item.start) }}
               </div>
             </template>
-            
+
             <!-- Template para data de fim -->
             <template #item.end="{ item }">
               <div class="text-no-wrap">
                 {{ formatDate(item.end) }}
               </div>
             </template>
-            
+
             <!-- Template para status -->
             <template #item.status="{ item }">
-              <VChip
-                :color="getStatusColor(item.extendedProps?.status)"
-                size="small"
-                class="text-capitalize"
-              >
+              <VChip :color="getStatusColor(item.extendedProps?.status)" size="small" class="text-capitalize">
                 {{ $t(item.extendedProps?.status || 'In Progress') }}
               </VChip>
             </template>
-            
+
             <!-- Template para ações -->
             <template #item.actions="{ item }">
               <VTooltip text="Ver no calendário">
                 <template #activator="{ props }">
-                  <IconBtn
-                    v-bind="props"
-                    size="small"
-                    @click="$router.push(`/apps/calendar?event=${item.id}`)"
-                  >
+                  <IconBtn v-bind="props" size="small" @click="$router.push(`/apps/calendar?event=${item.id}`)">
                     <VIcon icon="ri-calendar-line" />
                   </IconBtn>
                 </template>
               </VTooltip>
             </template>
           </VDataTable>
-          
+
           <!-- Estado vazio -->
           <div v-if="!isLoadingEvents && filteredEvents.length === 0" class="text-center pa-8">
             <VIcon icon="ri-calendar-line" size="64" class="text-disabled mb-4" />
@@ -733,30 +649,23 @@ watch([statusFilter, dateFilter, searchQuery], () => {
           <VCardTitle>{{ $t('Clientes Ativos') }} ({{ vendedorStats.clientsCount }})</VCardTitle>
           <VCardText>
             <VList v-if="vendedorClients.length" density="compact">
-              <VListItem
-                v-for="client in vendedorClients"
-                :key="client.id"
-                class="client-item"
-              >
+              <VListItem v-for="client in vendedorClients" :key="client.id" class="client-item">
                 <template #prepend>
                   <VAvatar size="32" color="primary" variant="tonal">
                     <VIcon icon="ri-building-line" />
                   </VAvatar>
                 </template>
-                
+
                 <VListItemTitle>{{ client.name }}</VListItemTitle>
-                
+
                 <template #append>
-                  <VChip
-                    :color="client.status === 'Ativo' ? 'success' : 'warning'"
-                    size="small"
-                  >
+                  <VChip :color="client.status === 'Ativo' ? 'success' : 'warning'" size="small">
                     {{ client.status }}
                   </VChip>
                 </template>
               </VListItem>
             </VList>
-            
+
             <VAlert v-else type="info" variant="tonal">
               {{ $t('Nenhum cliente ativo encontrado') }}
             </VAlert>

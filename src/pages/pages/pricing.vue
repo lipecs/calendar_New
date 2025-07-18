@@ -4,87 +4,48 @@
   <VCard>
     <VCardTitle class="d-flex justify-space-between align-center flex-wrap">
       {{ $t('Gerenciamento de Clientes') }}
-      <VBtn 
-        v-if="canManageClients"
-        color="primary" 
-        prepend-icon="ri-user-add-line" 
-        @click="openAddClientDialog"
-      >
+      <VBtn v-if="canManageClients" color="primary" prepend-icon="ri-user-add-line" @click="openAddClientDialog">
         {{ $t('Adicionar Cliente') }}
       </VBtn>
     </VCardTitle>
-    
+
     <VDivider />
-    
+
     <!-- Barra de Busca -->
     <VCardText>
       <VRow>
         <VCol cols="12" md="6">
-          <VTextField
-            v-model="searchQuery"
-            :label="$t('Buscar Cliente')"
-            :placeholder="$t('Digite o nome ou código do cliente')"
-            prepend-inner-icon="ri-search-line"
-            clearable
-            @input="searchClients"
-          />
+          <VTextField v-model="searchQuery" :label="$t('Buscar Cliente')"
+            :placeholder="$t('Digite o nome ou código do cliente')" prepend-inner-icon="ri-search-line" clearable
+            @input="searchClients" />
         </VCol>
         <VCol cols="12" md="3">
-          <VSelect
-            v-model="filterByCoordenador"
-            :label="$t('Filtrar por Coordenador')"
-            :items="availableCoordenadores"
-            item-title="username"
-            item-value="id"
-            clearable
-            @update:model-value="filterClients"
-          />
+          <VSelect v-model="filterByCoordenador" :label="$t('Filtrar por Coordenador')" :items="availableCoordenadores"
+            item-title="username" item-value="id" clearable @update:model-value="filterClients" />
         </VCol>
         <VCol cols="12" md="3">
-          <VSelect
-            v-model="filterByVendedor"
-            :label="$t('Filtrar por Vendedor')"
-            :items="availableVendedores"
-            item-title="username"
-            item-value="id"
-            clearable
-            @update:model-value="filterClients"
-          />
+          <VSelect v-model="filterByVendedor" :label="$t('Filtrar por Vendedor')" :items="availableVendedores"
+            item-title="username" item-value="id" clearable @update:model-value="filterClients" />
         </VCol>
       </VRow>
     </VCardText>
-    
+
     <!-- Alerta de mensagem -->
-    <VAlert
-      v-if="alert.show"
-      :type="alert.type"
-      closable
-      class="mx-4 mb-4"
-      @click:close="alert.show = false"
-    >
+    <VAlert v-if="alert.show" :type="alert.type" closable class="mx-4 mb-4" @click:close="alert.show = false">
       {{ alert.message }}
     </VAlert>
-    
+
     <!-- Tabela de Clientes -->
     <VCardText>
-      <VDataTable
-        :headers="headers"
-        :items="filteredClients"
-        :loading="isLoading"
-        class="elevation-1"
-        :items-per-page="10"
-      >
+      <VDataTable :headers="headers" :items="filteredClients" :loading="isLoading" class="elevation-1"
+        :items-per-page="10">
         <!-- Status -->
         <template #item.status="{ item }">
-          <VChip
-            :color="getStatusColor(item.status)"
-            size="small"
-            class="text-capitalize"
-          >
+          <VChip :color="getStatusColor(item.status)" size="small" class="text-capitalize">
             {{ $t(item.status) }}
           </VChip>
         </template>
-        
+
         <!-- Coordenador Responsável -->
         <template #item.coordenador="{ item }">
           <div v-if="item.coordenador" class="d-flex align-center">
@@ -104,7 +65,7 @@
             {{ $t('Não Atribuído') }}
           </VChip>
         </template>
-        
+
         <!-- Vendedor Responsável -->
         <template #item.vendedor="{ item }">
           <div v-if="item.vendedor" class="d-flex align-center">
@@ -124,35 +85,26 @@
             {{ $t('Não Atribuído') }}
           </VChip>
         </template>
-        
+
         <!-- Data de Criação -->
         <template #item.createdAt="{ item }">
           {{ formatDate(item.createdAt) }}
         </template>
-        
+
         <!-- Ações -->
         <template #item.actions="{ item }">
           <div class="d-flex gap-2">
             <VTooltip text="Editar Cliente">
               <template #activator="{ props }">
-                <IconBtn 
-                  v-if="canManageClients"
-                  v-bind="props"
-                  @click="editClient(item)"
-                >
+                <IconBtn v-if="canManageClients" v-bind="props" @click="editClient(item)">
                   <VIcon icon="ri-edit-box-line" />
                 </IconBtn>
               </template>
             </VTooltip>
-            
+
             <VTooltip text="Excluir Cliente">
               <template #activator="{ props }">
-                <IconBtn 
-                  v-if="canManageClients"
-                  v-bind="props"
-                  color="error" 
-                  @click="confirmDeleteClient(item)"
-                >
+                <IconBtn v-if="canManageClients" v-bind="props" color="error" @click="confirmDeleteClient(item)">
                   <VIcon icon="ri-delete-bin-7-line" />
                 </IconBtn>
               </template>
@@ -161,161 +113,97 @@
         </template>
       </VDataTable>
     </VCardText>
-    
+
     <!-- Dialog para Adicionar/Editar Cliente -->
-    <VDialog 
-      v-model="clientDialog" 
-      max-width="700px"
-      persistent
-    >
+    <VDialog v-model="clientDialog" max-width="700px" persistent>
       <VCard>
         <VCardTitle class="text-h5">
           {{ isEditMode ? $t('Editar Cliente') : $t('Adicionar Cliente') }}
         </VCardTitle>
-        
+
         <VCardText>
           <VForm ref="clientForm" @submit.prevent="saveClient">
             <VRow>
               <VCol cols="12" md="6">
-                <VTextField
-                  v-model="clientData.name"
-                  :label="$t('Nome do Cliente')"
-                  :rules="[v => !!v || $t('Nome é obrigatório')]"
-                  required
-                />
+                <VTextField v-model="clientData.name" :label="$t('Nome do Cliente')"
+                  :rules="[v => !!v || $t('Nome é obrigatório')]" required />
               </VCol>
-              
+
               <VCol cols="12" md="6">
-                <VTextField
-                  v-model="clientData.code"
-                  :label="$t('Código do Cliente')"
-                  :rules="[v => !!v || $t('Código é obrigatório')]"
-                  required
-                />
+                <VTextField v-model="clientData.code" :label="$t('Código do Cliente')"
+                  :rules="[v => !!v || $t('Código é obrigatório')]" required />
               </VCol>
-              
+
               <VCol cols="12">
-                <VTextField
-                  v-model="clientData.email"
-                  :label="$t('Email')"
-                  :rules="[v => !v || /.+@.+\..+/.test(v) || $t('Email deve ser válido')]"
-                  type="email"
-                />
+                <VTextField v-model="clientData.email" :label="$t('Email')"
+                  :rules="[v => !v || /.+@.+\..+/.test(v) || $t('Email deve ser válido')]" type="email" />
               </VCol>
-              
+
               <VCol cols="12" md="6">
-                <VTextField
-                  v-model="clientData.phone"
-                  :label="$t('Telefone')"
-                />
+                <VTextField v-model="clientData.phone" :label="$t('Telefone')" />
               </VCol>
-              
+
               <VCol cols="12" md="6">
-                <VSelect
-                  v-model="clientData.status"
-                  :label="$t('Status')"
-                  :items="statusOptions"
-                  :rules="[v => !!v || $t('Status é obrigatório')]"
-                  required
-                />
+                <VSelect v-model="clientData.status" :label="$t('Status')" :items="statusOptions"
+                  :rules="[v => !!v || $t('Status é obrigatório')]" required />
               </VCol>
-              
+
               <!-- Coordenador Responsável -->
               <VCol cols="12" md="6">
-                <VSelect
-                  v-model="clientData.coordenadorId"
-                  :label="$t('Coordenador Responsável')"
-                  :items="availableCoordenadores"
-                  item-title="username"
-                  item-value="id"
-                  :rules="[v => !!v || $t('Coordenador é obrigatório')]"
-                  required
-                />
+                <VSelect v-model="clientData.coordenadorId" :label="$t('Coordenador Responsável')"
+                  :items="availableCoordenadores" item-title="username" item-value="id"
+                  :rules="[v => !!v || $t('Coordenador é obrigatório')]" required />
               </VCol>
-              
+
               <!-- Vendedor Responsável -->
               <VCol cols="12" md="6">
-                <VSelect
-                  v-model="clientData.vendedorId"
-                  :label="$t('Vendedor Responsável')"
-                  :items="filteredVendedores"
-                  item-title="username"
-                  item-value="id"
-                  :rules="[v => !!v || $t('Vendedor é obrigatório')]"
-                  required
-                />
+                <VSelect v-model="clientData.vendedorId" :label="$t('Vendedor Responsável')" :items="filteredVendedores"
+                  item-title="username" item-value="id" :rules="[v => !!v || $t('Vendedor é obrigatório')]" required />
               </VCol>
-              
+
               <VCol cols="12">
-                <VTextarea
-                  v-model="clientData.address"
-                  :label="$t('Endereço')"
-                  rows="3"
-                />
+                <VTextarea v-model="clientData.address" :label="$t('Endereço')" rows="3" />
               </VCol>
-              
+
               <VCol cols="12">
-                <VTextarea
-                  v-model="clientData.notes"
-                  :label="$t('Observações')"
-                  rows="2"
-                />
+                <VTextarea v-model="clientData.notes" :label="$t('Observações')" rows="2" />
               </VCol>
             </VRow>
           </VForm>
         </VCardText>
-        
+
         <VCardActions>
           <VSpacer />
-          <VBtn
-            color="secondary"
-            variant="outlined"
-            @click="closeClientDialog"
-          >
+          <VBtn color="secondary" variant="outlined" @click="closeClientDialog">
             {{ $t('Cancelar') }}
           </VBtn>
-          <VBtn
-            color="primary"
-            :loading="isLoading"
-            @click="saveClient"
-          >
+          <VBtn color="primary" :loading="isLoading" @click="saveClient">
             {{ isEditMode ? $t('Atualizar') : $t('Salvar') }}
           </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
-    
+
     <!-- Dialog de Confirmação de Exclusão -->
-    <VDialog 
-      v-model="deleteDialog" 
-      max-width="400px"
-    >
+    <VDialog v-model="deleteDialog" max-width="400px">
       <VCard>
         <VCardTitle class="text-h5">
           {{ $t('Confirmar Exclusão') }}
         </VCardTitle>
-        
+
         <VCardText>
-          {{ $t('Tem certeza que deseja excluir o cliente') }} 
+          {{ $t('Tem certeza que deseja excluir o cliente') }}
           <strong>{{ clientToDelete?.name }}</strong>?
           <br><br>
           {{ $t('Esta ação não pode ser desfeita.') }}
         </VCardText>
-        
+
         <VCardActions>
           <VSpacer />
-          <VBtn
-            color="secondary"
-            variant="outlined"
-            @click="deleteDialog = false"
-          >
+          <VBtn color="secondary" variant="outlined" @click="deleteDialog = false">
             {{ $t('Cancelar') }}
           </VBtn>
-          <VBtn
-            color="error"
-            :loading="isLoading"
-            @click="deleteClient"
-          >
+          <VBtn color="error" :loading="isLoading" @click="deleteClient">
             {{ $t('Excluir') }}
           </VBtn>
         </VCardActions>
@@ -325,11 +213,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
 import authService from '@/services/auth';
-import userService from '@/services/user';
 import clientService from '@/services/client';
+import userService from '@/services/user';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
@@ -389,16 +277,15 @@ const headers = [
 const statusOptions = [
   { title: t('Ativo'), value: 'Ativo' },
   { title: t('Inativo'), value: 'Inativo' },
-  { title: t('Prospecto'), value: 'Prospecto' },
-  { title: t('Bloqueado'), value: 'Bloqueado' }
+  { title: t('Negociação'), value: 'Negociação' }
 ];
 
 const filteredVendedores = computed(() => {
   if (!clientData.value.coordenadorId) {
     return availableVendedores.value;
   }
-  
-  return availableVendedores.value.filter(vendedor => 
+
+  return availableVendedores.value.filter(vendedor =>
     vendedor.coordenadorId === clientData.value.coordenadorId
   );
 });
@@ -406,7 +293,7 @@ const filteredVendedores = computed(() => {
 const loadUsers = async () => {
   try {
     const users = await userService.getAllUsers();
-    
+
     availableCoordenadores.value = users.filter(u => u.role === 'coordenador');
     availableVendedores.value = users.filter(u => u.role === 'vendedor');
   } catch (error) {
@@ -418,7 +305,7 @@ const loadUsers = async () => {
 const loadClients = async () => {
   try {
     isLoading.value = true;
-    
+
     const data = await clientService.getAllClients();
     clients.value = data;
     filteredClients.value = [...clients.value];
@@ -436,31 +323,31 @@ const searchClients = () => {
 
 const filterClients = () => {
   let filtered = [...clients.value];
-  
+
   // Filtro por busca
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(client => 
+    filtered = filtered.filter(client =>
       client.name.toLowerCase().includes(query) ||
       client.code.toLowerCase().includes(query) ||
       (client.email && client.email.toLowerCase().includes(query))
     );
   }
-  
+
   // Filtro por coordenador
   if (filterByCoordenador.value) {
-    filtered = filtered.filter(client => 
+    filtered = filtered.filter(client =>
       client.coordenadorId === filterByCoordenador.value
     );
   }
-  
+
   // Filtro por vendedor
   if (filterByVendedor.value) {
-    filtered = filtered.filter(client => 
+    filtered = filtered.filter(client =>
       client.vendedorId === filterByVendedor.value
     );
   }
-  
+
   filteredClients.value = filtered;
 };
 
@@ -501,11 +388,11 @@ const closeClientDialog = () => {
   };
 };
 
-// ✅ CORRIGIDO: Salvar cliente usando backend
+//
 const saveClient = async () => {
   try {
     isLoading.value = true;
-    
+
     if (isEditMode.value) {
       const updatedClient = await clientService.updateClient(clientData.value.id, clientData.value);
       const index = clients.value.findIndex(c => c.id === clientData.value.id);
@@ -518,7 +405,7 @@ const saveClient = async () => {
       clients.value.push(newClient);
       showAlert('success', t('Cliente adicionado com sucesso'));
     }
-    
+
     filterClients();
     closeClientDialog();
   } catch (error) {
@@ -535,21 +422,21 @@ const confirmDeleteClient = (client) => {
   deleteDialog.value = true;
 };
 
-// ✅ CORRIGIDO: Excluir cliente usando backend
+// Excluir cliente usando backend
 const deleteClient = async () => {
   try {
     isLoading.value = true;
-    
+
     await clientService.deleteClient(clientToDelete.value.id);
-    
+
     const index = clients.value.findIndex(c => c.id === clientToDelete.value.id);
     if (index !== -1) {
       clients.value.splice(index, 1);
     }
-    
+
     showAlert('success', t('Cliente excluído com sucesso'));
     filterClients();
-    
+
     deleteDialog.value = false;
     clientToDelete.value = null;
   } catch (error) {
@@ -564,9 +451,8 @@ const deleteClient = async () => {
 const getStatusColor = (status) => {
   const colors = {
     'Ativo': 'success',
-    'Inativo': 'secondary',
-    'Prospecto': 'warning',
-    'Bloqueado': 'error'
+    'Inativo': 'error',
+    'Negociação': 'warning',
   };
   return colors[status] || 'primary';
 };
@@ -581,13 +467,13 @@ const showAlert = (type, message) => {
     type,
     message
   };
-  
+
   setTimeout(() => {
     alert.value.show = false;
   }, 5000);
 };
 
-// ✅ NOVO: Watch para limpar vendedor quando coordenador muda
+// Watch para limpar vendedor quando coordenador muda
 watch(() => clientData.value.coordenadorId, (newCoordenadorId) => {
   // Se o vendedor atual não pertence ao novo coordenador, limpar
   if (clientData.value.vendedorId) {

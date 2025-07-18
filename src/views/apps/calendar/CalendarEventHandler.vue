@@ -165,7 +165,7 @@ watch(() => props.event, (newEvent) => {
   if (newEvent) {
     event.value = JSON.parse(JSON.stringify(newEvent))
 
-    // ✅ CORRIGIDO: Carregar clientes se não estiverem carregados
+    // 
     if (event.value.extendedProps?.clienteId && availableClients.value.length === 0) {
       loadClients()
     }
@@ -304,25 +304,25 @@ const selectedClientDisplay = computed(() => {
   return client ? client.displayName : null
 })
 
-// ✅ CORRIGIDO: Filtrar clientes baseado no vendedor selecionado ou hierarquia
+// Filtrar clientes baseado no vendedor selecionado ou hierarquia
 const filteredClients = computed(() => {
   const currentUser = authService.getCurrentUser()
   const currentUserLevel = authService.getHierarchyLevel()
 
   // Se é vendedor, vê apenas seus clientes
-  if (authService.isVendedor()) {
+  if (authService.iqsVendedor()) {
     return availableClients.value.filter(client =>
       client.vendedorId === currentUser.userData.id ||
-      client.vendedorId === null // Clientes não atribuídos
+      client.vendedorId === null // 
     )
   }
 
-  // Se selecionou um vendedor específico, filtrar por ele
+  // 
   if (event.value.extendedProps?.assignedUser) {
     const selectedUserId = parseInt(event.value.extendedProps.assignedUser)
     return availableClients.value.filter(client =>
       client.vendedorId === selectedUserId ||
-      client.vendedorId === null // Clientes não atribuídos
+      client.vendedorId === null // 
     )
   }
 
