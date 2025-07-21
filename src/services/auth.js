@@ -121,6 +121,40 @@ class AuthService {
     const role = user.userData.role;
     return ['admin', 'diretor', 'supervisor', 'coordenador'].includes(role);
   }
+canAccessVendedoresPanel() {
+  const user = this.getCurrentUser();
+  if (!user || !user.userData) return false;
+  
+  const role = user.userData.role;
+  return ['admin', 'diretor', 'supervisor', 'coordenador'].includes(role);
+}
+
+// Adicionar método para verificar acesso ao Users Management
+canAccessUsersManagement() {
+  const user = this.getCurrentUser();
+  if (!user || !user.userData) return false;
+  
+  const role = user.userData.role;
+  return ['admin', 'diretor', 'coordenador'].includes(role);
+}
+
+// Adicionar método para verificar acesso ao painel de clientes
+canAccessClientesPanel() {
+  const user = this.getCurrentUser();
+  if (!user || !user.userData) return false;
+  
+  const role = user.userData.role;
+  return ['admin', 'diretor', 'supervisor'].includes(role);
+}
+
+// Corrigir método de seleção de agenda no calendário
+canSelectUserCalendar() {
+  const user = this.getCurrentUser();
+  if (!user || !user.userData) return false;
+  
+  const role = user.userData.role;
+  return ['admin', 'diretor', 'supervisor', 'coordenador'].includes(role);
+}
 
   // ✅ NOVO: Verificar se pode cadastrar clientes
   canManageClientes() {

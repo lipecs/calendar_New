@@ -84,7 +84,7 @@ const loadForms = async () => {
 
         forms.value = response.data || []
         console.log('✅ Formulários carregados:', forms.value.length)
-        showAlert('Formulários carregados!', 'success')
+
     } catch (error) {
         console.error('❌ Erro:', error)
         showAlert('Erro ao carregar formulários: ' + (error.response?.data || error.message), 'error')

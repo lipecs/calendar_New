@@ -189,7 +189,6 @@ class EventService {
       
       console.log('📥 Resposta recebida:', response.data?.length, 'eventos');
       
-      // ✅ CORRIGIDO: Processar eventos recebidos do servidor
       const processedEvents = response.data.map(event => this.processEventFromServer(event));
       return processedEvents;
     } catch (error) {

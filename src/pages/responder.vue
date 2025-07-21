@@ -1,4 +1,4 @@
-<!-- src/pages/responder.vue - CÓDIGO ORGANIZADO -->
+<!-- src/pages/responder.vue - CÓDIGO COMPLETO CORRIGIDO -->
 <script setup>
 import axios from 'axios'
 import { onMounted, ref } from 'vue'
@@ -11,7 +11,7 @@ const responses = ref({})
 const loading = ref(false)
 const alert = ref('')
 const alertType = ref('success')
-
+const currentUser = ref(null)
 // ============ UTILITÁRIOS ============
 const getUser = () => {
     try {
@@ -22,14 +22,122 @@ const getUser = () => {
     }
 }
 
-const getHeaders = () => {
-    const user = getUser()
-    if (!user) return {}
+// ============ FUNÇÃO CORRIGIDA getCurrentUser ============
+const getCurrentUser = () => {
+    try {
+        console.log('🔍 Verificando usuário atual...')
 
-    return {
-        'X-User-Id': user.id?.toString() || '',
-        'X-User-Role': (user.role || 'user').toUpperCase(),
-        'Content-Type': 'application/json'
+        // Primeira tentativa: verificar se existe 'user' no localStorage
+        let userData = null
+        let token = null
+
+        // Tentar diferentes chaves do localStorage
+        const possibleKeys = ['user', 'userData', 'currentUser', 'auth']
+
+        for (const key of possibleKeys) {
+            const stored = localStorage.getItem(key)
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored)
+                    console.log(`📋 Dados encontrados em '${key}':`, parsed)
+
+                    // Verificar se tem userData
+                    if (parsed.userData && parsed.userData.id) {
+                        userData = parsed.userData
+                        token = parsed.token || localStorage.getItem('token')
+                        break
+                    }
+                    // Verificar se o próprio objeto tem id
+                    else if (parsed.id) {
+                        userData = parsed
+                        token = localStorage.getItem('token')
+                        break
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Erro ao parsear ${key}:`, e)
+                }
+            }
+        }
+
+        // Se não encontrou userData, tentar token separado
+        if (!token) {
+            token = localStorage.getItem('token') || localStorage.getItem('authToken')
+        }
+
+        // Se ainda não tem userData, criar estrutura básica
+        if (!userData) {
+            console.warn('⚠️ userData não encontrado, tentando fallback...')
+
+            // Tentar extrair ID do token (se for JWT)
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]))
+                    if (payload.id || payload.userId || payload.sub) {
+                        userData = {
+                            id: payload.id || payload.userId || payload.sub,
+                            username: payload.username || payload.name || 'Usuário',
+                            email: payload.email || ''
+                        }
+                        console.log('✅ userData extraído do token:', userData)
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Não foi possível extrair dados do token:', e)
+                }
+            }
+        }
+
+        // Verificação final
+        if (!userData || !userData.id) {
+            console.error('❌ Não foi possível obter dados do usuário')
+            console.log('📋 localStorage keys disponíveis:', Object.keys(localStorage))
+
+            // Log de todos os itens do localStorage para debug
+            Object.keys(localStorage).forEach(key => {
+                console.log(`   ${key}:`, localStorage.getItem(key))
+            })
+
+            throw new Error('Usuário não autenticado ou dados inválidos')
+        }
+
+        const result = {
+            token: token || '',
+            userData: userData
+        }
+
+        console.log('✅ Usuário atual obtido:', result)
+        return result
+
+    } catch (error) {
+        console.error('❌ Erro ao obter usuário atual:', error)
+
+        // Opcional: redirecionar para login
+        // window.location.href = '/login'
+
+        throw error
+    }
+}
+
+const getHeaders = () => {
+    try {
+        const currentUser = getCurrentUser()
+
+        const headers = {
+            'Content-Type': 'application/json'
+        }
+
+        // Adicionar Authorization se tiver token
+        if (currentUser.token) {
+            headers['Authorization'] = `Bearer ${currentUser.token}`
+        }
+
+        console.log('📨 Headers preparados:', headers)
+        return headers
+
+    } catch (error) {
+        console.error('❌ Erro ao obter headers:', error)
+        return {
+            'Content-Type': 'application/json'
+        }
     }
 }
 
@@ -39,22 +147,37 @@ const showAlert = (message, type = 'success') => {
     setTimeout(() => { alert.value = '' }, 5000)
 }
 
-// ============ FUNÇÕES DE API ============
+// ============ FUNÇÕES DE API CORRIGIDAS ============
 const loadAvailableForms = async () => {
     try {
         loading.value = true
         console.log('🔄 Carregando formulários disponíveis...')
 
+        const currentUser = getCurrentUser() // ✅ Obter usuário aqui
+
         const response = await axios.get('http://localhost:8080/api/forms/available', {
-            headers: getHeaders()
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': currentUser.userData.id.toString(),
+                'Authorization': `Bearer ${currentUser.token}`
+            }
         })
 
         availableForms.value = response.data || []
         console.log('✅ Formulários disponíveis:', availableForms.value.length)
-        showAlert('Formulários carregados!', 'success')
     } catch (error) {
         console.error('❌ Erro:', error)
-        showAlert('Erro ao carregar formulários: ' + (error.response?.data || error.message), 'error')
+
+        let errorMessage = 'Erro desconhecido'
+        if (error.response?.data) {
+            errorMessage = typeof error.response.data === 'object'
+                ? error.response.data.error || JSON.stringify(error.response.data)
+                : error.response.data
+        } else {
+            errorMessage = error.message
+        }
+
+        showAlert('Erro ao carregar formulários: ' + errorMessage, 'error')
     } finally {
         loading.value = false
     }
@@ -64,8 +187,14 @@ const loadMyResponses = async () => {
     try {
         console.log('🔄 Carregando minhas respostas...')
 
+        const currentUser = getCurrentUser() // ✅ Obter usuário aqui
+
         const response = await axios.get('http://localhost:8080/api/forms/responses/my', {
-            headers: getHeaders()
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': currentUser.userData.id.toString(),
+                'Authorization': `Bearer ${currentUser.token}`
+            }
         })
 
         myResponses.value = response.data || []
@@ -81,20 +210,39 @@ const saveDraft = async () => {
         loading.value = true
         console.log('💾 Salvando rascunho...')
 
+        const currentUser = getCurrentUser() // ✅ Obter usuário aqui
+
         const payload = {
             formId: currentForm.value.id,
+            userId: currentUser.userData.id, // ✅ Agora está garantido que existe
             responses: JSON.stringify(responses.value),
             status: 'DRAFT'
         }
 
+        console.log('💾 Payload do rascunho:', payload)
+
         await axios.post('http://localhost:8080/api/forms/responses/draft', payload, {
-            headers: getHeaders()
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': currentUser.userData.id.toString(),
+                'Authorization': `Bearer ${currentUser.token}`
+            }
         })
 
         showAlert('Rascunho salvo!', 'success')
     } catch (error) {
         console.error('❌ Erro ao salvar rascunho:', error)
-        showAlert('Erro ao salvar rascunho: ' + (error.response?.data || error.message), 'error')
+
+        let errorMessage = 'Erro desconhecido'
+        if (error.response?.data) {
+            errorMessage = typeof error.response.data === 'object'
+                ? error.response.data.error || JSON.stringify(error.response.data)
+                : error.response.data
+        } else {
+            errorMessage = error.message
+        }
+
+        showAlert('Erro ao salvar rascunho: ' + errorMessage, 'error')
     } finally {
         loading.value = false
     }
@@ -111,16 +259,34 @@ const submitForm = async () => {
             return
         }
 
+        // 🔧 CORREÇÃO: Obter dados do usuário atual COM VALIDAÇÃO
+        const currentUser = getCurrentUser()
+
+        // ✅ Verificação adicional de segurança
+        if (!currentUser.userData || !currentUser.userData.id) {
+            throw new Error('Dados do usuário inválidos')
+        }
+
+        // 🔧 CORREÇÃO: Estruturar payload corretamente
         const payload = {
             formId: currentForm.value.id,
+            userId: currentUser.userData.id,
             responses: JSON.stringify(responses.value),
             status: 'COMPLETED'
         }
 
-        await axios.post('http://localhost:8080/api/forms/responses', payload, {
-            headers: getHeaders()
+        console.log('📤 Payload enviado:', payload)
+
+        // 🔧 CORREÇÃO: Usar endpoint correto com headers apropriados
+        const response = await axios.post('http://localhost:8080/api/forms/responses', payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': currentUser.userData.id.toString(), // ✅ Agora está protegido
+                'Authorization': `Bearer ${currentUser.token}`
+            }
         })
 
+        console.log('✅ Resposta do servidor:', response.data)
         showAlert('Formulário enviado com sucesso!', 'success')
 
         // Fechar e recarregar
@@ -130,7 +296,30 @@ const submitForm = async () => {
 
     } catch (error) {
         console.error('❌ Erro ao enviar formulário:', error)
-        showAlert('Erro ao enviar formulário: ' + (error.response?.data || error.message), 'error')
+
+        // 🔧 MELHOR TRATAMENTO DE ERRO
+        let errorMessage = 'Erro desconhecido'
+
+        if (error.response) {
+            // Erro do servidor
+            if (error.response.data && typeof error.response.data === 'object' && error.response.data.error) {
+                errorMessage = error.response.data.error
+            } else if (typeof error.response.data === 'string') {
+                errorMessage = error.response.data
+            } else {
+                errorMessage = `Erro ${error.response.status}: ${error.response.statusText}`
+            }
+            console.error('❌ Dados do erro:', error.response.data)
+            console.error('❌ Status do erro:', error.response.status)
+        } else if (error.request) {
+            // Erro de rede
+            errorMessage = 'Erro de conexão com o servidor'
+        } else {
+            // Erro de configuração
+            errorMessage = error.message
+        }
+
+        showAlert('Erro ao enviar formulário: ' + errorMessage, 'error')
     } finally {
         loading.value = false
     }
@@ -147,16 +336,27 @@ const startForm = (form) => {
         form.sections.forEach(section => {
             if (section.questions) {
                 section.questions.forEach(question => {
-                    // Inicializar array para múltipla escolha
-                    if (question.type === 'MULTIPLE') {
-                        responses.value[question.id] = []
-                    } else {
-                        responses.value[question.id] = ''
+                    // Inicializar baseado no tipo da questão
+                    switch (question.type) {
+                        case 'MULTIPLE':
+                            responses.value[question.id] = []
+                            break
+                        case 'NUMBER':
+                            responses.value[question.id] = null
+                            break
+                        case 'DATE':
+                        case 'TIME':
+                            responses.value[question.id] = ''
+                            break
+                        default:
+                            responses.value[question.id] = ''
                     }
                 })
             }
         })
     }
+
+    console.log('📝 Respostas inicializadas:', responses.value)
 }
 
 const closeForm = () => {
@@ -166,6 +366,7 @@ const closeForm = () => {
 
 const validateRequiredQuestions = () => {
     let hasError = false
+    const errors = []
 
     if (currentForm.value.sections) {
         currentForm.value.sections.forEach(section => {
@@ -174,17 +375,35 @@ const validateRequiredQuestions = () => {
                     if (question.required) {
                         const response = responses.value[question.id]
 
-                        // Verificar se está vazio
-                        if (!response ||
-                            (typeof response === 'string' && response.trim() === '') ||
-                            (Array.isArray(response) && response.length === 0)) {
-                            showAlert(`Questão obrigatória não respondida: ${question.title}`, 'error')
+                        // 🔧 VALIDAÇÃO MELHORADA
+                        let isEmpty = false
+
+                        if (response === null || response === undefined) {
+                            isEmpty = true
+                        } else if (typeof response === 'string' && response.trim() === '') {
+                            isEmpty = true
+                        } else if (Array.isArray(response) && response.length === 0) {
+                            isEmpty = true
+                        }
+
+                        if (isEmpty) {
+                            const errorMsg = `${section.title} - ${question.title}: Campo obrigatório`
+                            errors.push(errorMsg)
                             hasError = true
                         }
                     }
                 })
             }
         })
+    }
+
+    // 🔧 MOSTRAR TODOS OS ERROS DE UMA VEZ
+    if (hasError) {
+        const errorMessage = errors.length === 1
+            ? errors[0]
+            : `${errors.length} campos obrigatórios não preenchidos:\n• ${errors.join('\n• ')}`
+
+        showAlert(errorMessage, 'error')
     }
 
     return !hasError
@@ -200,30 +419,71 @@ const parseOptions = (optionsString) => {
 }
 
 const updateMultipleChoice = (questionId, option, checked) => {
+    console.log('🔄 Atualizando múltipla escolha:', { questionId, option, checked })
+
     if (!Array.isArray(responses.value[questionId])) {
         responses.value[questionId] = []
     }
 
     if (checked) {
-        responses.value[questionId].push(option)
+        // Adicionar opção se não estiver presente
+        if (!responses.value[questionId].includes(option)) {
+            responses.value[questionId].push(option)
+        }
     } else {
+        // Remover opção
         responses.value[questionId] = responses.value[questionId].filter(item => item !== option)
     }
+
+    console.log('🔄 Respostas atualizadas para questão', questionId, ':', responses.value[questionId])
 }
 
 const isOptionSelected = (questionId, option) => {
-    return Array.isArray(responses.value[questionId]) ?
-        responses.value[questionId].includes(option) : false
+    return Array.isArray(responses.value[questionId])
+        ? responses.value[questionId].includes(option)
+        : false
+}
+const canViewOthersResponses = computed(() => {
+    if (!currentUser.value?.userData?.role) return false
+
+    const role = currentUser.value.userData.role
+    return ['admin', 'diretor', 'supervisor', 'coordenador'].includes(role)
+})
+
+// ✅ NOVO: Navegação para página de visualização
+const navigateToViewResponses = () => {
+    // Adapte conforme seu sistema de roteamento
+    // Exemplo usando Vue Router:
+    // router.push('/visualizar-respostas')
+
+    // Ou usando window.location:
+    window.location.href = '/visualizar-respostas'
+
+    // Ou usando sua implementação de navegação
+    showAlert('Redirecionando para visualizar respostas...', 'info')
 }
 
-// ============ LIFECYCLE ============
-onMounted(() => {
-    console.log('🚀 Iniciando página de respostas...')
-    console.log('👤 Usuário logado:', getUser())
 
-    loadAvailableForms()
-    loadMyResponses()
+// ============ LIFECYCLE ============
+onMounted(async () => {
+    try {
+        console.log('🚀 Iniciando página de respostas...')
+
+        // ✅ NOVO: Armazenar usuário atual
+        currentUser.value = getCurrentUser()
+        console.log('👤 Usuário logado:', currentUser.value.userData)
+
+        await loadAvailableForms()
+        await loadMyResponses()
+
+        console.log('✅ Componente inicializado com sucesso')
+    } catch (error) {
+        console.error('❌ Erro na inicialização:', error)
+        showAlert('Erro ao inicializar página: ' + error.message, 'error')
+    }
 })
+
+
 </script>
 
 <template>
@@ -338,16 +598,19 @@ onMounted(() => {
             <!-- Header do Formulário -->
             <div class="d-flex justify-space-between align-center mb-6">
                 <div>
-                    <h1 class="text-h4 mb-1">{{ currentForm.title }}</h1>
-                    <p v-if="currentForm.description" class="text-medium-emphasis">
-                        {{ currentForm.description }}
-                    </p>
+                    <h1 class="text-h4 mb-2">Responder Formulários</h1>
+                    <p class="text-medium-emphasis">Formulários disponíveis para você</p>
                 </div>
-                <VBtn color="secondary" variant="outlined" @click="closeForm">
-                    <VIcon icon="ri-close-line" class="me-2" />
-                    Fechar
-                </VBtn>
+
+                <!-- ✅ NOVO: Botão para visualizar respostas (apenas para Admin, Diretor, Supervisor, Coordenador) -->
+                <div v-if="canViewOthersResponses" class="d-flex gap-2">
+                    <VBtn color="info" variant="outlined" @click="navigateToViewResponses" :disabled="loading">
+                        <VIcon icon="ri-eye-line" class="me-2" />
+                        Ver Respostas
+                    </VBtn>
+                </div>
             </div>
+
 
             <!-- Alerta -->
             <VAlert v-if="alert" :type="alertType" class="mb-4" closable @click:close="alert = ''">

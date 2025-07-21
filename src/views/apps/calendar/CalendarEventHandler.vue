@@ -47,7 +47,6 @@ const alert = ref({
   message: ''
 })
 
-// ✅ CORRIGIDO: Carregar usuários - hierarquia aprimorada
 const loadUsers = async () => {
   if (!canCreateForOthers.value) return
 
@@ -93,7 +92,6 @@ const loadUsers = async () => {
   }
 }
 
-// ✅ CORRIGIDO: Carregar clientes do backend
 const loadClients = async () => {
   try {
     isLoadingClients.value = true
@@ -188,7 +186,6 @@ const removeEvent = () => {
   emit('update:isDrawerOpen', false)
 }
 
-// ✅ CORRIGIDO: Handle submit - melhor controle de userId e clienteId
 const handleSubmit = () => {
   refForm.value?.validate().then(({ valid }) => {
     if (valid) {
@@ -198,7 +195,6 @@ const handleSubmit = () => {
         title: event.value.title
       })
 
-      // ✅ CORRIGIDO: Determinar o userId correto
       let targetUserId = authService.getCurrentUser().userData.id
 
       // Se é criação para outro usuário (supervisor/coordenador/diretor/admin)
@@ -304,25 +300,23 @@ const selectedClientDisplay = computed(() => {
   return client ? client.displayName : null
 })
 
-// Filtrar clientes baseado no vendedor selecionado ou hierarquia
 const filteredClients = computed(() => {
   const currentUser = authService.getCurrentUser()
   const currentUserLevel = authService.getHierarchyLevel()
 
-  // Se é vendedor, vê apenas seus clientes
-  if (authService.iqsVendedor()) {
+  if (authService.isVendedor()) {
     return availableClients.value.filter(client =>
       client.vendedorId === currentUser.userData.id ||
-      client.vendedorId === null // 
+      client.vendedorId === null
     )
   }
 
-  // 
+  // Se um vendedor foi selecionado, filtrar clientes deste vendedor
   if (event.value.extendedProps?.assignedUser) {
     const selectedUserId = parseInt(event.value.extendedProps.assignedUser)
     return availableClients.value.filter(client =>
       client.vendedorId === selectedUserId ||
-      client.vendedorId === null // 
+      client.vendedorId === null
     )
   }
 
@@ -334,7 +328,6 @@ const filteredClients = computed(() => {
   return availableClients.value
 })
 
-// ✅ CORRIGIDO: Limpa cliente se vendedor muda e cliente não pertence ao novo vendedor
 watch(() => event.value.extendedProps?.assignedUser, (newUserId, oldUserId) => {
   if (newUserId !== oldUserId && event.value.extendedProps?.clienteId) {
     const currentClient = availableClients.value.find(c => c.id === parseInt(event.value.extendedProps.clienteId))

@@ -6,22 +6,23 @@ export default [
     icon: { icon: 'ri-calendar-line' },
     to: 'apps-calendar',
   },
-
-
-  { 
-    heading: 'Administration',
-    action: 'manage',
-    subject: 'Users',
-  },
-  {
-    title: 'Users Management',
-    icon: { icon: 'ri-user-settings-line' },
-    to: 'admin-users',
-    action: 'manage',
-    subject: 'Users',
-  },
-
-
+  { heading: 'Forms' },
+{
+  title: 'Formulários',
+  icon: { icon: 'ri-file-list-2-line' },
+  children: [
+    {
+      title: 'Gerenciar',
+      to: 'formularios',
+      icon: { icon: 'ri-settings-2-line' }
+    },
+    {
+      title: 'Responder',
+      to: 'responder',
+      icon: { icon: 'ri-file-check-line' }
+    }
+  ]
+},
   { 
     heading: 'Profiles',
     // Mostrar seção apenas para admins ou quando houver itens visíveis
@@ -42,7 +43,6 @@ export default [
         action: 'manage',
         subject: 'Salespeople',
         // Será filtrado pelo sistema de permissões
-        adminOnly: true
       },
 
       { 
@@ -51,10 +51,22 @@ export default [
         action: 'manage', 
         subject: 'clients',
         // Será filtrado pelo sistema de permissões
-        adminOnly: true
       },
     ],
   },
+  { 
+    heading: 'Administration',
+    action: 'manage',
+    subject: 'Users',
+  },
+  {
+    title: 'Users Management',
+    icon: { icon: 'ri-user-settings-line' },
+    to: 'admin-users',
+    action: 'manage',
+    subject: 'Users',
+  },
+
 
   /*
   { heading: 'Desenvolvimento' },

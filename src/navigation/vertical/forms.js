@@ -1,5 +1,5 @@
 export default [
-  { heading: 'Forms' },
+  // { heading: 'Forms' },
   // {
   //   title: 'Form Elements',
   //   icon: { icon: 'ri-radio-button-line' },
@@ -26,22 +26,23 @@ export default [
   //   icon: { icon: 'ri-layout-4-line' },
   //   to: 'forms-form-layouts',
   // },
-  {
-  title: 'Formulários',
-  icon: { icon: 'ri-file-list-2-line' },
-  children: [
-    {
-      title: 'Gerenciar',
-      to: 'formularios',
-      icon: { icon: 'ri-settings-2-line' }
-    },
-    {
-      title: 'Responder',
-      to: 'responder',
-      icon: { icon: 'ri-file-check-line' }
-    }
-  ]
-},
+//   {
+//   title: 'Formulários',
+//   icon: { icon: 'ri-file-list-2-line' },
+//   children: [
+//     {
+//       title: 'Gerenciar',
+//       to: 'formularios',
+//       icon: { icon: 'ri-settings-2-line' }
+//     },
+//     {
+//       title: 'Responder',
+//       to: 'responder',
+//       icon: { icon: 'ri-file-check-line' }
+//     }
+//   ]
+// },
+
 
   // {
   //   title: 'Form Validation',
