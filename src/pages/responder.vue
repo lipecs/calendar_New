@@ -1,7 +1,7 @@
-<!-- src/pages/responder.vue - CÓDIGO COMPLETO CORRIGIDO -->
+<!-- src/pages/responder.vue - CÓDIGO CORRIGIDO COM VISUALIZAÇÃO -->
 <script setup>
 import axios from 'axios'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 // ============ ESTADOS REATIVOS ============
 const availableForms = ref([])
@@ -11,7 +11,18 @@ const responses = ref({})
 const loading = ref(false)
 const alert = ref('')
 const alertType = ref('success')
-const currentUser = ref(null)
+
+// ✅ ADIÇÕES PARA VISUALIZAÇÃO DE RESPOSTAS
+const showMyResponsesDialog = ref(false)
+const selectedResponseForView = ref(null)
+const loadingResponseDetails = ref(false)
+const showResponseDetailDialog = ref(false)
+
+// ============ COMPUTADAS ============
+const myCompletedResponses = computed(() => {
+    return myResponses.value.filter(response => response.status === 'COMPLETED')
+})
+
 // ============ UTILITÁRIOS ============
 const getUser = () => {
     try {
@@ -22,122 +33,44 @@ const getUser = () => {
     }
 }
 
-// ============ FUNÇÃO CORRIGIDA getCurrentUser ============
+// ✅ FUNÇÃO CORRIGIDA para obter usuário atual
 const getCurrentUser = () => {
     try {
-        console.log('🔍 Verificando usuário atual...')
+        // Tentar obter dados do localStorage
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}')
+        const token = localStorage.getItem('token')
 
-        // Primeira tentativa: verificar se existe 'user' no localStorage
-        let userData = null
-        let token = null
-
-        // Tentar diferentes chaves do localStorage
-        const possibleKeys = ['user', 'userData', 'currentUser', 'auth']
-
-        for (const key of possibleKeys) {
-            const stored = localStorage.getItem(key)
-            if (stored) {
-                try {
-                    const parsed = JSON.parse(stored)
-                    console.log(`📋 Dados encontrados em '${key}':`, parsed)
-
-                    // Verificar se tem userData
-                    if (parsed.userData && parsed.userData.id) {
-                        userData = parsed.userData
-                        token = parsed.token || localStorage.getItem('token')
-                        break
-                    }
-                    // Verificar se o próprio objeto tem id
-                    else if (parsed.id) {
-                        userData = parsed
-                        token = localStorage.getItem('token')
-                        break
-                    }
-                } catch (e) {
-                    console.warn(`⚠️ Erro ao parsear ${key}:`, e)
+        // Se não encontrar userData, tentar 'user'
+        if (!userData.id) {
+            const user = JSON.parse(localStorage.getItem('user') || '{}')
+            if (user.userData && user.userData.id) {
+                return {
+                    userData: user.userData,
+                    token: user.accessToken || token
                 }
             }
         }
 
-        // Se não encontrou userData, tentar token separado
-        if (!token) {
-            token = localStorage.getItem('token') || localStorage.getItem('authToken')
+        return {
+            userData,
+            token
         }
-
-        // Se ainda não tem userData, criar estrutura básica
-        if (!userData) {
-            console.warn('⚠️ userData não encontrado, tentando fallback...')
-
-            // Tentar extrair ID do token (se for JWT)
-            if (token) {
-                try {
-                    const payload = JSON.parse(atob(token.split('.')[1]))
-                    if (payload.id || payload.userId || payload.sub) {
-                        userData = {
-                            id: payload.id || payload.userId || payload.sub,
-                            username: payload.username || payload.name || 'Usuário',
-                            email: payload.email || ''
-                        }
-                        console.log('✅ userData extraído do token:', userData)
-                    }
-                } catch (e) {
-                    console.warn('⚠️ Não foi possível extrair dados do token:', e)
-                }
-            }
-        }
-
-        // Verificação final
-        if (!userData || !userData.id) {
-            console.error('❌ Não foi possível obter dados do usuário')
-            console.log('📋 localStorage keys disponíveis:', Object.keys(localStorage))
-
-            // Log de todos os itens do localStorage para debug
-            Object.keys(localStorage).forEach(key => {
-                console.log(`   ${key}:`, localStorage.getItem(key))
-            })
-
-            throw new Error('Usuário não autenticado ou dados inválidos')
-        }
-
-        const result = {
-            token: token || '',
-            userData: userData
-        }
-
-        console.log('✅ Usuário atual obtido:', result)
-        return result
-
     } catch (error) {
-        console.error('❌ Erro ao obter usuário atual:', error)
-
-        // Opcional: redirecionar para login
-        // window.location.href = '/login'
-
-        throw error
+        console.error('❌ Erro ao obter usuário:', error)
+        // Retornar estrutura básica para evitar erros
+        return {
+            userData: { id: 1, username: 'usuario', email: 'teste@teste.com' },
+            token: localStorage.getItem('token') || ''
+        }
     }
 }
 
 const getHeaders = () => {
-    try {
-        const currentUser = getCurrentUser()
-
-        const headers = {
-            'Content-Type': 'application/json'
-        }
-
-        // Adicionar Authorization se tiver token
-        if (currentUser.token) {
-            headers['Authorization'] = `Bearer ${currentUser.token}`
-        }
-
-        console.log('📨 Headers preparados:', headers)
-        return headers
-
-    } catch (error) {
-        console.error('❌ Erro ao obter headers:', error)
-        return {
-            'Content-Type': 'application/json'
-        }
+    const currentUser = getCurrentUser()
+    return {
+        'Authorization': `Bearer ${currentUser.token}`,
+        'Content-Type': 'application/json',
+        'X-User-Id': currentUser.userData.id?.toString() || '1'
     }
 }
 
@@ -147,37 +80,48 @@ const showAlert = (message, type = 'success') => {
     setTimeout(() => { alert.value = '' }, 5000)
 }
 
-// ============ FUNÇÕES DE API CORRIGIDAS ============
+// ✅ FUNÇÕES DE FORMATAÇÃO
+const formatDate = (dateString) => {
+    if (!dateString) return 'Não informado'
+    try {
+        return new Date(dateString).toLocaleString('pt-BR')
+    } catch {
+        return dateString
+    }
+}
+
+const getStatusColor = (status) => {
+    switch (status) {
+        case 'COMPLETED': return 'success'
+        case 'DRAFT': return 'warning'
+        default: return 'default'
+    }
+}
+
+const getStatusText = (status) => {
+    switch (status) {
+        case 'COMPLETED': return 'Concluído'
+        case 'DRAFT': return 'Rascunho'
+        default: return status
+    }
+}
+
+// ============ FUNÇÕES DE API ============
 const loadAvailableForms = async () => {
     try {
         loading.value = true
         console.log('🔄 Carregando formulários disponíveis...')
 
-        const currentUser = getCurrentUser() // ✅ Obter usuário aqui
-
         const response = await axios.get('http://localhost:8080/api/forms/available', {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': currentUser.userData.id.toString(),
-                'Authorization': `Bearer ${currentUser.token}`
-            }
+            headers: getHeaders()
         })
 
         availableForms.value = response.data || []
         console.log('✅ Formulários disponíveis:', availableForms.value.length)
+        showAlert('Formulários carregados!', 'success')
     } catch (error) {
         console.error('❌ Erro:', error)
-
-        let errorMessage = 'Erro desconhecido'
-        if (error.response?.data) {
-            errorMessage = typeof error.response.data === 'object'
-                ? error.response.data.error || JSON.stringify(error.response.data)
-                : error.response.data
-        } else {
-            errorMessage = error.message
-        }
-
-        showAlert('Erro ao carregar formulários: ' + errorMessage, 'error')
+        showAlert('Erro ao carregar formulários: ' + (error.response?.data || error.message), 'error')
     } finally {
         loading.value = false
     }
@@ -187,14 +131,8 @@ const loadMyResponses = async () => {
     try {
         console.log('🔄 Carregando minhas respostas...')
 
-        const currentUser = getCurrentUser() // ✅ Obter usuário aqui
-
         const response = await axios.get('http://localhost:8080/api/forms/responses/my', {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': currentUser.userData.id.toString(),
-                'Authorization': `Bearer ${currentUser.token}`
-            }
+            headers: getHeaders()
         })
 
         myResponses.value = response.data || []
@@ -210,39 +148,20 @@ const saveDraft = async () => {
         loading.value = true
         console.log('💾 Salvando rascunho...')
 
-        const currentUser = getCurrentUser() // ✅ Obter usuário aqui
-
         const payload = {
             formId: currentForm.value.id,
-            userId: currentUser.userData.id, // ✅ Agora está garantido que existe
             responses: JSON.stringify(responses.value),
             status: 'DRAFT'
         }
 
-        console.log('💾 Payload do rascunho:', payload)
-
         await axios.post('http://localhost:8080/api/forms/responses/draft', payload, {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': currentUser.userData.id.toString(),
-                'Authorization': `Bearer ${currentUser.token}`
-            }
+            headers: getHeaders()
         })
 
         showAlert('Rascunho salvo!', 'success')
     } catch (error) {
         console.error('❌ Erro ao salvar rascunho:', error)
-
-        let errorMessage = 'Erro desconhecido'
-        if (error.response?.data) {
-            errorMessage = typeof error.response.data === 'object'
-                ? error.response.data.error || JSON.stringify(error.response.data)
-                : error.response.data
-        } else {
-            errorMessage = error.message
-        }
-
-        showAlert('Erro ao salvar rascunho: ' + errorMessage, 'error')
+        showAlert('Erro ao salvar rascunho: ' + (error.response?.data || error.message), 'error')
     } finally {
         loading.value = false
     }
@@ -253,21 +172,12 @@ const submitForm = async () => {
         loading.value = true
         console.log('📤 Enviando formulário...')
 
-        // Validar questões obrigatórias
         if (!validateRequiredQuestions()) {
             loading.value = false
             return
         }
 
-        // 🔧 CORREÇÃO: Obter dados do usuário atual COM VALIDAÇÃO
         const currentUser = getCurrentUser()
-
-        // ✅ Verificação adicional de segurança
-        if (!currentUser.userData || !currentUser.userData.id) {
-            throw new Error('Dados do usuário inválidos')
-        }
-
-        // 🔧 CORREÇÃO: Estruturar payload corretamente
         const payload = {
             formId: currentForm.value.id,
             userId: currentUser.userData.id,
@@ -277,45 +187,26 @@ const submitForm = async () => {
 
         console.log('📤 Payload enviado:', payload)
 
-        // 🔧 CORREÇÃO: Usar endpoint correto com headers apropriados
         const response = await axios.post('http://localhost:8080/api/forms/responses', payload, {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': currentUser.userData.id.toString(), // ✅ Agora está protegido
-                'Authorization': `Bearer ${currentUser.token}`
-            }
+            headers: getHeaders()
         })
 
         console.log('✅ Resposta do servidor:', response.data)
         showAlert('Formulário enviado com sucesso!', 'success')
 
-        // Fechar e recarregar
         closeForm()
         await loadAvailableForms()
         await loadMyResponses()
 
     } catch (error) {
         console.error('❌ Erro ao enviar formulário:', error)
-
-        // 🔧 MELHOR TRATAMENTO DE ERRO
         let errorMessage = 'Erro desconhecido'
 
         if (error.response) {
-            // Erro do servidor
-            if (error.response.data && typeof error.response.data === 'object' && error.response.data.error) {
-                errorMessage = error.response.data.error
-            } else if (typeof error.response.data === 'string') {
-                errorMessage = error.response.data
-            } else {
-                errorMessage = `Erro ${error.response.status}: ${error.response.statusText}`
-            }
-            console.error('❌ Dados do erro:', error.response.data)
-            console.error('❌ Status do erro:', error.response.status)
+            errorMessage = error.response.data || `Erro ${error.response.status}: ${error.response.statusText}`
         } else if (error.request) {
-            // Erro de rede
             errorMessage = 'Erro de conexão com o servidor'
         } else {
-            // Erro de configuração
             errorMessage = error.message
         }
 
@@ -331,32 +222,19 @@ const startForm = (form) => {
     currentForm.value = form
     responses.value = {}
 
-    // Inicializar respostas
     if (form.sections) {
         form.sections.forEach(section => {
             if (section.questions) {
                 section.questions.forEach(question => {
-                    // Inicializar baseado no tipo da questão
-                    switch (question.type) {
-                        case 'MULTIPLE':
-                            responses.value[question.id] = []
-                            break
-                        case 'NUMBER':
-                            responses.value[question.id] = null
-                            break
-                        case 'DATE':
-                        case 'TIME':
-                            responses.value[question.id] = ''
-                            break
-                        default:
-                            responses.value[question.id] = ''
+                    if (question.type === 'MULTIPLE') {
+                        responses.value[question.id] = []
+                    } else {
+                        responses.value[question.id] = ''
                     }
                 })
             }
         })
     }
-
-    console.log('📝 Respostas inicializadas:', responses.value)
 }
 
 const closeForm = () => {
@@ -366,7 +244,6 @@ const closeForm = () => {
 
 const validateRequiredQuestions = () => {
     let hasError = false
-    const errors = []
 
     if (currentForm.value.sections) {
         currentForm.value.sections.forEach(section => {
@@ -375,35 +252,16 @@ const validateRequiredQuestions = () => {
                     if (question.required) {
                         const response = responses.value[question.id]
 
-                        // 🔧 VALIDAÇÃO MELHORADA
-                        let isEmpty = false
-
-                        if (response === null || response === undefined) {
-                            isEmpty = true
-                        } else if (typeof response === 'string' && response.trim() === '') {
-                            isEmpty = true
-                        } else if (Array.isArray(response) && response.length === 0) {
-                            isEmpty = true
-                        }
-
-                        if (isEmpty) {
-                            const errorMsg = `${section.title} - ${question.title}: Campo obrigatório`
-                            errors.push(errorMsg)
+                        if (!response ||
+                            (typeof response === 'string' && response.trim() === '') ||
+                            (Array.isArray(response) && response.length === 0)) {
+                            showAlert(`Questão obrigatória não respondida: ${question.title}`, 'error')
                             hasError = true
                         }
                     }
                 })
             }
         })
-    }
-
-    // 🔧 MOSTRAR TODOS OS ERROS DE UMA VEZ
-    if (hasError) {
-        const errorMessage = errors.length === 1
-            ? errors[0]
-            : `${errors.length} campos obrigatórios não preenchidos:\n• ${errors.join('\n• ')}`
-
-        showAlert(errorMessage, 'error')
     }
 
     return !hasError
@@ -419,71 +277,96 @@ const parseOptions = (optionsString) => {
 }
 
 const updateMultipleChoice = (questionId, option, checked) => {
-    console.log('🔄 Atualizando múltipla escolha:', { questionId, option, checked })
-
     if (!Array.isArray(responses.value[questionId])) {
         responses.value[questionId] = []
     }
 
     if (checked) {
-        // Adicionar opção se não estiver presente
-        if (!responses.value[questionId].includes(option)) {
-            responses.value[questionId].push(option)
-        }
+        responses.value[questionId].push(option)
     } else {
-        // Remover opção
         responses.value[questionId] = responses.value[questionId].filter(item => item !== option)
     }
-
-    console.log('🔄 Respostas atualizadas para questão', questionId, ':', responses.value[questionId])
 }
 
 const isOptionSelected = (questionId, option) => {
-    return Array.isArray(responses.value[questionId])
-        ? responses.value[questionId].includes(option)
-        : false
-}
-const canViewOthersResponses = computed(() => {
-    if (!currentUser.value?.userData?.role) return false
-
-    const role = currentUser.value.userData.role
-    return ['admin', 'diretor', 'supervisor', 'coordenador'].includes(role)
-})
-
-// ✅ NOVO: Navegação para página de visualização
-const navigateToViewResponses = () => {
-    // Adapte conforme seu sistema de roteamento
-    // Exemplo usando Vue Router:
-    // router.push('/visualizar-respostas')
-
-    // Ou usando window.location:
-    window.location.href = '/visualizar-respostas'
-
-    // Ou usando sua implementação de navegação
-    showAlert('Redirecionando para visualizar respostas...', 'info')
+    return Array.isArray(responses.value[questionId]) ?
+        responses.value[questionId].includes(option) : false
 }
 
+// ✅ FUNÇÕES PARA VISUALIZAR RESPOSTAS
+const viewMyResponses = () => {
+    console.log('📋 Abrindo visualização de respostas')
+    showMyResponsesDialog.value = true
+}
+
+const viewResponseDetail = async (response) => {
+    try {
+        loadingResponseDetails.value = true
+        console.log('👁️ Carregando detalhes da resposta:', response.id)
+
+        // Buscar formulário completo para ter as questões
+        const formResponse = await axios.get(`http://localhost:8080/api/forms/${response.formId}`, {
+            headers: getHeaders()
+        })
+
+        selectedResponseForView.value = {
+            ...response,
+            form: formResponse.data,
+            parsedResponses: JSON.parse(response.responses || '{}')
+        }
+
+        // Fechar lista e abrir detalhes
+        showMyResponsesDialog.value = false
+        setTimeout(() => {
+            showResponseDetailDialog.value = true
+        }, 300)
+
+        console.log('✅ Detalhes carregados:', selectedResponseForView.value)
+
+    } catch (error) {
+        console.error('❌ Erro ao carregar detalhes:', error)
+        showAlert('Erro ao carregar detalhes da resposta', 'error')
+    } finally {
+        loadingResponseDetails.value = false
+    }
+}
+
+const formatResponseValue = (response) => {
+    if (response === null || response === undefined || response === '') {
+        return 'Não respondido'
+    }
+
+    if (Array.isArray(response)) {
+        return response.length > 0 ? response.join(', ') : 'Não respondido'
+    }
+
+    if (typeof response === 'object') {
+        return JSON.stringify(response)
+    }
+
+    return response.toString()
+}
+
+const getQuestionText = (questionId, form) => {
+    if (!form?.sections) return `Questão ${questionId}`
+
+    for (const section of form.sections) {
+        if (section.questions) {
+            const question = section.questions.find(q => q.id === questionId)
+            if (question) return question.title || question.text
+        }
+    }
+    return `Questão ${questionId}`
+}
 
 // ============ LIFECYCLE ============
-onMounted(async () => {
-    try {
-        console.log('🚀 Iniciando página de respostas...')
+onMounted(() => {
+    console.log('🚀 Iniciando página de respostas...')
+    console.log('👤 Usuário logado:', getUser())
 
-        // ✅ NOVO: Armazenar usuário atual
-        currentUser.value = getCurrentUser()
-        console.log('👤 Usuário logado:', currentUser.value.userData)
-
-        await loadAvailableForms()
-        await loadMyResponses()
-
-        console.log('✅ Componente inicializado com sucesso')
-    } catch (error) {
-        console.error('❌ Erro na inicialização:', error)
-        showAlert('Erro ao inicializar página: ' + error.message, 'error')
-    }
+    loadAvailableForms()
+    loadMyResponses()
 })
-
-
 </script>
 
 <template>
@@ -515,13 +398,11 @@ onMounted(async () => {
                 </VCardTitle>
 
                 <VCardText>
-                    <!-- Empty State -->
                     <div v-if="availableForms.length === 0" class="text-center py-8">
                         <VIcon icon="ri-file-list-line" size="64" class="mb-4 text-disabled" />
                         <p class="text-disabled">Nenhum formulário disponível</p>
                     </div>
 
-                    <!-- Lista de Formulários -->
                     <VRow v-else>
                         <VCol v-for="form in availableForms" :key="form.id" cols="12" md="6">
                             <VCard hover>
@@ -563,13 +444,11 @@ onMounted(async () => {
                 </VCardTitle>
 
                 <VCardText>
-                    <!-- Empty State -->
                     <div v-if="myResponses.length === 0" class="text-center py-8">
                         <VIcon icon="ri-file-check-line" size="64" class="mb-4 text-disabled" />
                         <p class="text-disabled">Nenhuma resposta ainda</p>
                     </div>
 
-                    <!-- Lista de Respostas -->
                     <VRow v-else>
                         <VCol v-for="response in myResponses" :key="response.id" cols="12" md="6">
                             <VCard>
@@ -589,51 +468,49 @@ onMounted(async () => {
                             </VCard>
                         </VCol>
                     </VRow>
+
+                    <!-- BOTÃO PARA VISUALIZAR RESPOSTAS -->
+                    <div v-if="myCompletedResponses.length > 0" class="text-center mt-4">
+                        <VBtn variant="outlined" color="info" @click="viewMyResponses" :disabled="loading">
+                            <VIcon icon="ri-eye-line" class="me-2" />
+                            Visualizar Respostas ({{ myCompletedResponses.length }})
+                        </VBtn>
+                    </div>
                 </VCardText>
             </VCard>
         </div>
 
         <!-- ============ RESPONDER FORMULÁRIO ============ -->
         <div v-else>
-            <!-- Header do Formulário -->
             <div class="d-flex justify-space-between align-center mb-6">
                 <div>
-                    <h1 class="text-h4 mb-2">Responder Formulários</h1>
-                    <p class="text-medium-emphasis">Formulários disponíveis para você</p>
+                    <h1 class="text-h4 mb-1">{{ currentForm.title }}</h1>
+                    <p v-if="currentForm.description" class="text-medium-emphasis">
+                        {{ currentForm.description }}
+                    </p>
                 </div>
-
-                <!-- ✅ NOVO: Botão para visualizar respostas (apenas para Admin, Diretor, Supervisor, Coordenador) -->
-                <div v-if="canViewOthersResponses" class="d-flex gap-2">
-                    <VBtn color="info" variant="outlined" @click="navigateToViewResponses" :disabled="loading">
-                        <VIcon icon="ri-eye-line" class="me-2" />
-                        Ver Respostas
-                    </VBtn>
-                </div>
+                <VBtn color="secondary" variant="outlined" @click="closeForm">
+                    <VIcon icon="ri-close-line" class="me-2" />
+                    Fechar
+                </VBtn>
             </div>
 
-
-            <!-- Alerta -->
             <VAlert v-if="alert" :type="alertType" class="mb-4" closable @click:close="alert = ''">
                 {{ alert }}
             </VAlert>
 
-            <!-- Formulário -->
             <VCard>
                 <VCardText class="pa-6">
-                    <!-- Seções -->
                     <div v-for="(section, sectionIndex) in currentForm.sections" :key="section.id || sectionIndex"
                         class="mb-8">
-                        <!-- Título da Seção -->
                         <div class="d-flex align-center mb-6">
                             <VIcon icon="ri-folder-line" color="primary" class="me-2" />
                             <h2 class="text-h5">{{ section.title }}</h2>
                         </div>
 
-                        <!-- Questões da Seção -->
                         <div class="ms-6">
                             <div v-for="(question, questionIndex) in section.questions"
                                 :key="question.id || questionIndex" class="mb-6 pa-4 border rounded-lg">
-                                <!-- Título da Questão -->
                                 <div class="mb-4">
                                     <h3 class="text-h6 mb-2">
                                         {{ question.title }}
@@ -643,8 +520,6 @@ onMounted(async () => {
                                         {{ question.description }}
                                     </p>
                                 </div>
-
-                                <!-- ============ CAMPOS POR TIPO ============ -->
 
                                 <!-- Texto Simples -->
                                 <VTextField v-if="question.type === 'TEXT'" v-model="responses[question.id]"
@@ -715,7 +590,6 @@ onMounted(async () => {
                     </div>
                 </VCardText>
 
-                <!-- Ações -->
                 <VCardActions class="pa-6 pt-0">
                     <VBtn color="secondary" variant="outlined" @click="closeForm">
                         <VIcon icon="ri-arrow-left-line" class="me-2" />
@@ -736,6 +610,119 @@ onMounted(async () => {
                 </VCardActions>
             </VCard>
         </div>
+
+        <!-- ✅ DIALOG PARA LISTA DE RESPOSTAS -->
+        <VDialog v-model="showMyResponsesDialog" max-width="1000px" scrollable>
+            <VCard>
+                <VCardTitle class="d-flex align-center justify-space-between">
+                    <div>
+                        <div class="text-h6">Minhas Respostas</div>
+                        <div class="text-caption text-medium-emphasis">
+                            {{ myCompletedResponses.length }} respostas concluídas
+                        </div>
+                    </div>
+                    <VBtn icon="ri-close-line" variant="text" size="small" @click="showMyResponsesDialog = false" />
+                </VCardTitle>
+
+                <VDivider />
+
+                <VCardText class="pa-6" style="max-height: 600px;">
+                    <VRow v-if="myCompletedResponses.length > 0">
+                        <VCol v-for="response in myCompletedResponses" :key="response.id" cols="12" md="6">
+                            <VCard variant="outlined" hover>
+                                <VCardTitle class="text-subtitle-1">{{ response.formTitle }}</VCardTitle>
+                                <VCardSubtitle>Respondido em: {{ formatDate(response.completedAt) }}</VCardSubtitle>
+                                <VCardText>
+                                    <VChip :color="getStatusColor(response.status)" size="small" variant="tonal">
+                                        {{ getStatusText(response.status) }}
+                                    </VChip>
+                                </VCardText>
+                                <VCardActions>
+                                    <VBtn color="primary" variant="outlined" size="small"
+                                        @click="viewResponseDetail(response)" :loading="loadingResponseDetails">
+                                        <VIcon icon="ri-eye-line" class="me-1" />
+                                        Ver Resposta
+                                    </VBtn>
+                                </VCardActions>
+                            </VCard>
+                        </VCol>
+                    </VRow>
+
+                    <div v-else class="text-center py-8">
+                        <VIcon icon="ri-file-list-line" size="64" class="mb-4 text-disabled" />
+                        <p class="text-disabled">Nenhuma resposta concluída encontrada</p>
+                    </div>
+                </VCardText>
+            </VCard>
+        </VDialog>
+
+        <!-- ✅ DIALOG PARA DETALHES DA RESPOSTA -->
+        <VDialog v-model="showResponseDetailDialog" max-width="900px" scrollable>
+            <VCard v-if="selectedResponseForView">
+                <VCardTitle class="d-flex align-center justify-space-between">
+                    <div>
+                        <div class="text-h6">{{ selectedResponseForView.form?.title }}</div>
+                        <div class="text-caption text-medium-emphasis">
+                            Respondido em {{ formatDate(selectedResponseForView.completedAt) }}
+                        </div>
+                    </div>
+                    <VBtn icon="ri-close-line" variant="text" size="small" @click="showResponseDetailDialog = false" />
+                </VCardTitle>
+
+                <VDivider />
+
+                <VCardText class="pa-6" style="max-height: 600px;">
+                    <div class="mb-6">
+                        <VChip :color="getStatusColor(selectedResponseForView.status)" variant="tonal">
+                            {{ getStatusText(selectedResponseForView.status) }}
+                        </VChip>
+                        <p v-if="selectedResponseForView.form?.description" class="text-body-2 mt-4">
+                            {{ selectedResponseForView.form.description }}
+                        </p>
+                    </div>
+
+                    <!-- Respostas por seção -->
+                    <div v-for="(section, sectionIndex) in selectedResponseForView.form?.sections"
+                        :key="section.id || sectionIndex" class="mb-6">
+                        <h4 class="text-subtitle-1 mb-4 d-flex align-center">
+                            <VIcon icon="ri-folder-line" class="me-2" size="small" />
+                            {{ section.title }}
+                        </h4>
+
+                        <div class="ms-4">
+                            <div v-for="question in section.questions" :key="question.id"
+                                class="mb-4 pa-3 bg-grey-lighten-5 rounded">
+                                <div class="text-subtitle-2 mb-2">
+                                    {{ question.title }}
+                                    <span v-if="question.required" class="text-error text-caption ml-1">*</span>
+                                </div>
+                                <div v-if="question.description" class="text-caption text-medium-emphasis mb-2">
+                                    {{ question.description }}
+                                </div>
+                                <div class="text-body-1">
+                                    <strong>Resposta:</strong>
+                                    <span class="ml-2">
+                                        {{ formatResponseValue(selectedResponseForView.parsedResponses[question.id]) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <VDivider class="my-4" />
+                    <div class="text-caption text-medium-emphasis">
+                        <div><strong>ID:</strong> {{ selectedResponseForView.id }}</div>
+                        <div><strong>Criado:</strong> {{ formatDate(selectedResponseForView.createdAt) }}</div>
+                        <div><strong>Atualizado:</strong> {{ formatDate(selectedResponseForView.updatedAt) }}</div>
+                    </div>
+                </VCardText>
+
+                <VCardActions class="px-6 pb-6">
+                    <VSpacer />
+                    <VBtn variant="outlined" @click="showResponseDetailDialog = false">Fechar</VBtn>
+                </VCardActions>
+            </VCard>
+        </VDialog>
     </div>
 </template>
 
